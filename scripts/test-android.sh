@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p verification
+gradle --no-daemon :app:connectedDebugAndroidTest
+adb pull /sdcard/Android/data/com.mixax.speedreader/files/screenshots verification/
+# Install the actual release APK after removing the differently signed test build.
+adb uninstall com.mixax.speedreader
+adb install app/build/outputs/apk/release/app-release.apk
+adb shell am start -W -n com.mixax.speedreader/.MainActivity | tee verification/release-start.txt
+sleep 3
+adb shell pidof com.mixax.speedreader
+adb logcat -d -s AndroidRuntime:E > verification/release-errors.txt
+if grep -q 'FATAL EXCEPTION' verification/release-errors.txt; then cat verification/release-errors.txt; exit 1; fi
+adb exec-out screencap -p > verification/release-installed.png
+# Large system font and narrow landscape are retained as review evidence.
+adb shell settings put system font_scale 1.3
+sleep 2
+adb exec-out screencap -p > verification/large-font.png
+adb shell settings put system font_scale 1.0
