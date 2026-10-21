@@ -56,7 +56,7 @@ public final class Book {
         p.setInput(input, null); // Honors XML declaration, including Windows-1251.
         StringBuilder title = new StringBuilder(), paragraph = new StringBuilder();
         List<String> words = new ArrayList<>();
-        int bodyDepth = -1, titleDepth = -1; boolean root = false;
+        int bodyDepth = -1, titleDepth = -1; boolean root = false, rootClosed = false;
         for (int event = p.getEventType(); event != XmlPullParser.END_DOCUMENT; event = p.nextToken()) {
             if (event == XmlPullParser.DOCDECL) throw new IOException("DTD");
             if (event == XmlPullParser.START_TAG) {
@@ -72,6 +72,7 @@ public final class Book {
                 }
             } else if (event == XmlPullParser.END_TAG) {
                 String tag = p.getName();
+                if (p.getDepth() == 1 && "FictionBook".equals(tag)) rootClosed = true;
                 if (p.getDepth() == titleDepth) titleDepth = -1;
                 if (bodyDepth >= 0 && ("p".equals(tag) || "v".equals(tag) || "subtitle".equals(tag) || "title".equals(tag) || "body".equals(tag))) {
                     String text = paragraph.toString().trim(); paragraph.setLength(0);
@@ -81,7 +82,7 @@ public final class Book {
                 if (p.getDepth() == bodyDepth) bodyDepth = -1;
             }
         }
-        if (!root) throw new IOException("FB2");
+        if (!root || !rootClosed) throw new IOException("FB2");
         return new Book(title.toString().trim(), words);
     }
     public void save(File directory) throws Exception {

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 mkdir -p verification
+trap 'if [ ! -d verification/screenshots ]; then adb pull /sdcard/Android/data/com.mixax.speedreader/files/screenshots verification/ || true; fi' EXIT
 gradle --no-daemon :app:connectedDebugAndroidTest
 adb pull /sdcard/Android/data/com.mixax.speedreader/files/screenshots verification/
 # Install the actual release APK after removing the differently signed test build.

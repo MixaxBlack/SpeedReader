@@ -33,7 +33,7 @@ public class ReaderTest {
     }
     @Test public void rejectInvalidEmptyAndEntities() throws Exception {
         for(String s:new String[]{"<html><p>Wrong</p></html>",xml(""),xml("broken").replace("</FictionBook>",""),"<!DOCTYPE FictionBook [<!ENTITY x SYSTEM 'file:///etc/passwd'>]>"+xml("&x;").replaceFirst("<\\?xml[^>]+>","")}) {
-            try {parse(s); fail("Accepted invalid input");} catch(Exception expected) {assertNotNull(expected);}
+            try {parse(s); fail("Accepted invalid input: "+s);} catch(Exception expected) {assertNotNull(expected);}
         }
     }
     @Test public void cacheRoundTripAndIdentity() throws Exception {
