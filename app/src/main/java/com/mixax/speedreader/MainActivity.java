@@ -38,7 +38,8 @@ public class MainActivity extends AppCompatActivity {
     boolean playing, settings, busy;
     String language;
     LinearLayout root, content;
-    LinearLayout backdropRoot;
+    View backdropRoot, insetsHost;
+    LibraryScanner.Result lastScanResult;
     boolean backdropDark;
     int backdropLeft=-1,backdropRight=-1,backdropBottom=-1;
     TextView word, progress, bookTitle, state, speedValue;
@@ -131,22 +132,22 @@ public class MainActivity extends AppCompatActivity {
     void styleSlider(Slider slider){slider.setTickVisible(false);slider.setTrackActiveTintList(ColorStateList.valueOf(ACCENT));slider.setTrackInactiveTintList(ColorStateList.valueOf(RULE));slider.setThumbTintList(ColorStateList.valueOf(ACCENT));}
     boolean darkNavigation(){return Build.VERSION.SDK_INT<27||(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;}
     void systemBars(){
-        if(root==null)return;boolean dark=darkNavigation();
-        androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),root);
+        if(insetsHost==null)return;boolean dark=darkNavigation();
+        androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),insetsHost);
         bars.setAppearanceLightStatusBars(true);bars.setAppearanceLightNavigationBars(!dark);
         if(Build.VERSION.SDK_INT>=29){getWindow().setNavigationBarContrastEnforced(false);getWindow().getDecorView().setForceDarkAllowed(false);}
-        WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(root);
+        WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(insetsHost);
         androidx.core.graphics.Insets nav=dark&&insets!=null?insets.getInsets(WindowInsetsCompat.Type.navigationBars()):androidx.core.graphics.Insets.NONE;
-        if(backdropRoot==root&&backdropDark==dark&&backdropLeft==nav.left&&backdropRight==nav.right&&backdropBottom==nav.bottom)return;
-        backdropRoot=root;backdropDark=dark;backdropLeft=nav.left;backdropRight=nav.right;backdropBottom=nav.bottom;
-        int left=root.getPaddingLeft(),top=root.getPaddingTop(),right=root.getPaddingRight(),bottom=root.getPaddingBottom();
+        if(backdropRoot==insetsHost&&backdropDark==dark&&backdropLeft==nav.left&&backdropRight==nav.right&&backdropBottom==nav.bottom)return;
+        backdropRoot=insetsHost;backdropDark=dark;backdropLeft=nav.left;backdropRight=nav.right;backdropBottom=nav.bottom;
+        int left=insetsHost.getPaddingLeft(),top=insetsHost.getPaddingTop(),right=insetsHost.getPaddingRight(),bottom=insetsHost.getPaddingBottom();
         if(dark){
             // Android 15 draws navigation over app content. Protect its actual inset,
             // including a side-mounted navigation bar, without darkening the reader.
             android.graphics.drawable.LayerDrawable backdrop=new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{new android.graphics.drawable.ColorDrawable(INK),new android.graphics.drawable.ColorDrawable(PAPER)});
-            backdrop.setLayerInset(1,nav.left,0,nav.right,nav.bottom);root.setBackground(backdrop);
-        }else root.setBackgroundColor(PAPER);
-        root.setPadding(left,top,right,bottom);
+            backdrop.setLayerInset(1,nav.left,0,nav.right,nav.bottom);insetsHost.setBackground(backdrop);
+        }else insetsHost.setBackgroundColor(PAPER);
+        insetsHost.setPadding(left,top,right,bottom);
     }
     void field(EditText field){field.setTypeface(uiFace);field.setTextColor(INK);field.setHintTextColor(MUTED);field.setMinHeight(dp(52));field.setTextSize(16);field.setPadding(dp(14),dp(8),dp(14),dp(8));GradientDrawable fill=new GradientDrawable();fill.setColor(Color.WHITE);fill.setCornerRadius(dp(8));fill.setStroke(dp(1),RULE);field.setBackground(fill);}
     void row(LinearLayout parent, View... views) {
@@ -157,15 +158,16 @@ public class MainActivity extends AppCompatActivity {
     void render() {
         root = vertical(); root.setBackgroundColor(PAPER); root.setPadding(dp(20),0,dp(20),0);
         boolean compactHeight = !settings && !libraryOpen && (getResources().getConfiguration().screenHeightDp < 600 || getResources().getConfiguration().fontScale > 1.5f);
+        insetsHost=root;
         if (compactHeight) {
-            ScrollView viewport = new ScrollView(this); viewport.setFillViewport(true); viewport.addView(root); setContentView(viewport);
+            ScrollView viewport = new ScrollView(this); viewport.setFillViewport(true); viewport.setClipToPadding(true); viewport.addView(root); insetsHost=viewport; setContentView(viewport);
         } else setContentView(root);
-        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+        ViewCompat.setOnApplyWindowInsetsListener(insetsHost, (v, insets) -> {
             androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.ime());
-            v.setPadding(dp(20)+bars.left, bars.top, dp(20)+bars.right, bars.bottom);systemBars();return insets;
+            int side=v==root?dp(20):0;v.setPadding(side+bars.left, bars.top, side+bars.right, bars.bottom);systemBars();return insets;
         });
         systemBars();root.post(this::systemBars);
-        ViewCompat.requestApplyInsets(root);
+        ViewCompat.requestApplyInsets(insetsHost);
         if (settings) { settingsScreen(); return; }
         if(libraryOpen){libraryScreen();return;}
         header("SpeedReader",button(tr("Appearance", "Оформление"), () -> { pause(); settings = true; render(); }));
@@ -296,7 +298,7 @@ public class MainActivity extends AppCompatActivity {
     void scanPhone(){
         if(busy)return;pause();
         if(hasPhoneAccess()){startPhoneScan(PhoneScanner.roots(this));return;}
-        pendingPhoneAccess=true;
+        lastScanResult=null;pendingPhoneAccess=true;
         if(Build.VERSION.SDK_INT>=30){
             try{startActivityForResult(new Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,Uri.parse("package:"+getPackageName())),PHONE_ACCESS);}
             catch(ActivityNotFoundException absent){try{startActivityForResult(new Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION),PHONE_ACCESS);}catch(ActivityNotFoundException missing){pendingPhoneAccess=false;folderError();}}
@@ -305,11 +307,11 @@ public class MainActivity extends AppCompatActivity {
     @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] grants){super.onRequestPermissionsResult(code,permissions,grants);if(code==PHONE_READ){pendingPhoneAccess=false;if(hasPhoneAccess())startPhoneScan(PhoneScanner.roots(this));else{libraryMessage=tr("Phone access was not granted. Choose a folder instead.","Доступ к памяти не предоставлен. Выберите отдельную папку.");render();}}}
     void startPhoneScan(List<File> roots){
         if(busy){if(!scanning)pendingPhoneScan=true;return;}
-        pause();libraryOpen=true;phoneFilesOpen=true;phoneScanning=true;scanning=true;busy=true;libraryQuery="";scanCancelled=new AtomicBoolean();AtomicBoolean cancellation=scanCancelled;render();
+        pause();libraryOpen=true;phoneFilesOpen=true;phoneScanning=true;scanning=true;busy=true;libraryQuery="";lastScanResult=null;scanCancelled=new AtomicBoolean();AtomicBoolean cancellation=scanCancelled;render();
         io.execute(() -> {
             PhoneScanner.Scan result=PhoneScanner.scan(getApplicationContext(),roots,cancellation,snapshot -> runOnUiThread(() -> {if(!isDestroyed()&&libraryOpen&&libraryStatus!=null)libraryStatus.setText(scanSummary(snapshot,false));}));
             List<BookStore.Entry> entries=new BookStore(getFilesDir()).entries();
-            runOnUiThread(() -> {if(!isDestroyed()){phoneScanning=false;scanning=false;busy=false;if(!result.files.isEmpty()||!result.stats.cancelled)phoneFiles=result.files;libraryEntries=entries;libraryMessage=scanSummary(result.stats,true);render();}});
+            runOnUiThread(() -> {if(!isDestroyed()){phoneScanning=false;scanning=false;busy=false;if(!result.files.isEmpty()||!result.stats.cancelled)phoneFiles=result.files;libraryEntries=entries;lastScanResult=result.stats;libraryMessage=scanSummary(result.stats,true);render();}});
         });
     }
     void openFound(PhoneScanner.FoundFile file){
@@ -340,13 +342,13 @@ public class MainActivity extends AppCompatActivity {
             .setPositiveButton(tr("OK","Понятно"),null).show();
     }
     void startScan(List<Uri> roots){
-        if(busy){if(!scanning)pendingScanRoots=new ArrayList<>(roots);return;}pause();libraryOpen=true;phoneFilesOpen=false;scanning=true;busy=true;scanCancelled=new AtomicBoolean();AtomicBoolean cancellation=scanCancelled;render();
+        if(busy){if(!scanning)pendingScanRoots=new ArrayList<>(roots);return;}pause();libraryOpen=true;phoneFilesOpen=false;scanning=true;busy=true;lastScanResult=null;scanCancelled=new AtomicBoolean();AtomicBoolean cancellation=scanCancelled;render();
         io.execute(() -> {
             LibraryScanner.Result result=LibraryScanner.scan(getApplicationContext(),roots,cancellation,snapshot -> runOnUiThread(() -> {
                 if(!isDestroyed()&&libraryOpen&&libraryStatus!=null)libraryStatus.setText(scanSummary(snapshot,false));
             }));
             List<BookStore.Entry> entries=new BookStore(getFilesDir()).entries();
-            runOnUiThread(() -> {if(!isDestroyed()){scanning=false;busy=false;libraryEntries=entries;libraryMessage=scanSummary(result,true);render();}});
+            runOnUiThread(() -> {if(!isDestroyed()){scanning=false;busy=false;libraryEntries=entries;lastScanResult=result;libraryMessage=scanSummary(result,true);render();}});
         });
     }
     String scanSummary(LibraryScanner.Result r,boolean complete){
@@ -357,6 +359,7 @@ public class MainActivity extends AppCompatActivity {
             (!complete&&!r.current.isEmpty()?"\n"+r.current:"");
     }
     void libraryScreen(){
+        if(lastScanResult!=null&&!libraryMessage.isEmpty()&&!scanning)libraryMessage=scanSummary(lastScanResult,true);
         boolean compactLibrary=getResources().getConfiguration().screenHeightDp<500;
         header(phoneFilesOpen?tr("Found FB2","Найденные FB2"):tr("Library","Библиотека"),button(tr("Read","Читать"),this::closeLibrary));
         MaterialButton phone=button(scanning?tr("Stop scan","Остановить"):tr("Scan phone","Сканировать телефон"),() -> {if(scanning)scanCancelled.set(true);else scanPhone();});primary(phone);phone.setEnabled(scanning||!busy);
@@ -396,7 +399,8 @@ public class MainActivity extends AppCompatActivity {
             LinearLayout item=vertical();item.setPadding(dp(4),dp(12),dp(4),dp(12));PhoneScanner.FoundFile file=filtered.get(index);
             TextView title=text(file.title,22);title.setTypeface(Typeface.create("serif",Typeface.NORMAL));title.setMaxLines(2);title.setEllipsize(android.text.TextUtils.TruncateAt.END);item.addView(title);
             if(!file.author.isEmpty())item.addView(text(file.author,15));
-            TextView path=text(file.path,12);path.setMaxLines(2);path.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);item.addView(path);
+            if(!file.title.equals(file.name()))item.addView(text(file.name(),14));
+            TextView path=text(file.path,12);path.setSingleLine(true);path.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);item.addView(path);
             if(file.bookId.isEmpty())item.addView(text(tr("Could not import · tap to retry","Не удалось добавить · нажмите для повтора"),12));
             item.setContentDescription(file.title+". "+file.path);return item;
         }
@@ -420,7 +424,7 @@ public class MainActivity extends AppCompatActivity {
         header(tr("Appearance", "Оформление"),button(tr("Done", "Готово"), () -> { settings=false; render(); }));
         ScrollView scroll = new ScrollView(this); root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1)); content = vertical(); scroll.addView(content);
         section(content,tr("Interface language", "Язык интерфейса"));
-        choice(content,new String[]{tr("System", "Системный"),"English","Русский"},Arrays.asList("system","en","ru").indexOf(language), i -> { language = new String[]{"system","en","ru"}[i]; saveSettings(); render(); });
+        choice(content,new String[]{tr("System", "Системный"),"English","Русский"},Arrays.asList("system","en","ru").indexOf(language), i -> { language = new String[]{"system","en","ru"}[i]; if(lastScanResult==null)libraryMessage=""; saveSettings(); render(); });
         section(content,tr("Word preview", "Предпросмотр слова"));
         TextView preview = text(tr("Attention", "Внимание"),fontSize); preview.setGravity(Gravity.CENTER); preview.setTextColor(foreground); preview.setBackgroundColor(background); preview.setTypeface(Typeface.create(faces[font],Typeface.NORMAL)); preview.setMinHeight(dp(120)); content.addView(preview);
         section(content,tr("Word size", "Размер слова"));
@@ -453,9 +457,9 @@ public class MainActivity extends AppCompatActivity {
         section(content,tr("Reading speed", "Скорость чтения"));
         TextView speedLabel=text(speed+tr(" words / min"," слов / мин"),16);speedLabel.setGravity(Gravity.CENTER);content.addView(speedLabel);
         LinearLayout speedRail=vertical();speedRail.setGravity(Gravity.CENTER_HORIZONTAL);content.addView(speedRail);
-        speedRail.addView(text("500",14));speedControl=new VerticalSpeedBar(this);speedControl.setProgress(speed);
+        TextView maximum=text("500",14);maximum.setGravity(Gravity.CENTER);speedRail.addView(maximum);speedControl=new VerticalSpeedBar(this);speedControl.setProgress(speed);
         speedControl.setContentDescription(tr("Reading speed, words per minute. Up to increase.","Скорость чтения, слов в минуту. Вверх — быстрее."));
-        speedRail.addView(speedControl,new LinearLayout.LayoutParams(dp(64),dp(320)));speedRail.addView(text("30",14));
+        speedRail.addView(speedControl,new LinearLayout.LayoutParams(dp(64),dp(320)));TextView minimum=text("30",14);minimum.setGravity(Gravity.CENTER);speedRail.addView(minimum);
         speedControl.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
             public void onProgressChanged(SeekBar bar,int value,boolean user){changeSpeed(value);speedLabel.setText(speed+tr(" words / min"," слов / мин"));}
             public void onStartTrackingTouch(SeekBar bar){}public void onStopTrackingTouch(SeekBar bar){}

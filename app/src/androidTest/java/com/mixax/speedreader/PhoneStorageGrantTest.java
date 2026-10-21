@@ -22,7 +22,7 @@ public class PhoneStorageGrantTest {
                 helper.waitReady(scenario);scenario.onActivity(a -> {a.language="en";a.library();});helper.waitReady(scenario);
                 scenario.onActivity(a -> {assertTrue(a.hasPhoneAccess());assertTrue(PhoneScanner.roots(a).stream().anyMatch(f->f.equals(Environment.getExternalStorageDirectory())));a.scanPhone();});helper.waitReady(scenario);
                 scenario.onActivity(a -> {assertTrue(a.phoneFilesOpen);assertTrue(a.phoneFiles.stream().anyMatch(f->f.title.equals("Телефонная книга")));});device.screenshot("phone-found-en.png");
-                scenario.onActivity(a -> {a.language="ru";a.render();a.librarySearch.setText("Соколова");assertTrue(a.foundAdapter.getCount()>=2);});device.screenshot("phone-found-ru.png");
+                scenario.onActivity(a -> {a.language="ru";a.render();assertTrue(a.libraryStatus.getText().toString().contains("���������:"));assertFalse(a.libraryStatus.getText().toString().contains("Added:"));a.librarySearch.setText("Соколова");assertTrue(a.foundAdapter.getCount()>=2);});device.screenshot("phone-found-ru.png");
                 scenario.recreate();helper.waitReady(scenario);
                 scenario.onActivity(a -> {assertTrue(a.phoneFilesOpen);assertEquals("Соколова",a.libraryQuery);assertTrue(a.foundAdapter.getCount()>=2);a.pendingPhoneAccess=true;});
                 scenario.recreate();helper.waitReady(scenario);
