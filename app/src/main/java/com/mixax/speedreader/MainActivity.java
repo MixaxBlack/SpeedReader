@@ -29,7 +29,7 @@ import android.text.TextWatcher;
 public class MainActivity extends AppCompatActivity {
     static final int PAPER=0xFFF7F6F3, INK=0xFF252922, MUTED=0xFF62685D, RULE=0xFFDCDDD5, ACCENT=0xFF426650;
     Typeface uiFace;
-    static final int OPEN = 41, SCAN_FOLDER=42;
+    static final int OPEN = 41, SCAN_FOLDER=42, PHONE_ACCESS=43, PHONE_READ=44;
     final Handler handler = new Handler(Looper.getMainLooper());
     final ExecutorService io = Executors.newSingleThreadExecutor();
     android.content.SharedPreferences prefs;
@@ -54,6 +54,9 @@ public class MainActivity extends AppCompatActivity {
     EditText librarySearch;
     ListView libraryList;
     LibraryAdapter libraryAdapter;
+    boolean phoneFilesOpen,phoneScanning,pendingPhoneScan,pendingPhoneAccess;
+    List<PhoneScanner.FoundFile> phoneFiles=new ArrayList<>();
+    FoundAdapter foundAdapter;
     final String[] faces = {"serif", "sans-serif", "monospace", "sans-serif-condensed"};
     final Runnable tick = new Runnable() {
         public void run() {
@@ -72,6 +75,7 @@ public class MainActivity extends AppCompatActivity {
         uiFace=getResources().getFont(R.font.ui_regular);
         prefs = getSharedPreferences("reader", MODE_PRIVATE);
         libraryOpen=saved!=null&&saved.getBoolean("libraryOpen",false);
+        phoneFilesOpen=saved!=null&&saved.getBoolean("phoneFilesOpen",false);pendingPhoneAccess=saved!=null&&saved.getBoolean("pendingPhoneAccess",false);
         libraryQuery=saved==null?"":saved.getString("libraryQuery","");
         language = prefs.getString("language", "system");
         if(saved!=null&&saved.getBoolean("scanning",false))libraryMessage=tr("Scan stopped. Saved books remain in the library.","Сканирование остановлено. Добавленные книги сохранены.");
@@ -94,8 +98,10 @@ public class MainActivity extends AppCompatActivity {
             catch (Exception error) { runOnUiThread(() -> failure(error)); }
             Book result = loaded;
             List<BookStore.Entry> restoredEntries=restoreLibrary?new BookStore(getFilesDir()).entries():new ArrayList<>();
+            List<PhoneScanner.FoundFile> restoredFiles=restoreLibrary?PhoneScanner.load(this):new ArrayList<>();
             runOnUiThread(() -> {
-                if (isDestroyed()) return; busy = false;libraryEntries=restoredEntries; if (result != null) select(result); else render();
+                if (isDestroyed()) return; busy = false;libraryEntries=restoredEntries;phoneFiles=restoredFiles; if (result != null) select(result); else render();
+                if(pendingPhoneScan){pendingPhoneScan=false;startPhoneScan(PhoneScanner.roots(this));}
                 if(!pendingScanRoots.isEmpty()){List<Uri> pending=pendingScanRoots;pendingScanRoots=Collections.emptyList();startScan(pending);}
             });
         });
@@ -239,6 +245,7 @@ public class MainActivity extends AppCompatActivity {
     void open() { if(busy)return;pause(); Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT); i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*"); startActivityForResult(i,OPEN); }
     @Override protected void onActivityResult(int request,int result,Intent data) {
         super.onActivityResult(request,result,data);
+        if(request==PHONE_ACCESS){pendingPhoneAccess=false;if(hasPhoneAccess())startPhoneScan(PhoneScanner.roots(this));else{libraryMessage=tr("Phone access was not granted. You can still choose a folder.","Доступ к памяти не предоставлен. Можно выбрать отдельную папку.");if(libraryOpen)render();}return;}
         if(request==SCAN_FOLDER){
             if(result!=RESULT_OK||data==null||data.getData()==null)return;
             Uri tree=data.getData();
@@ -269,7 +276,8 @@ public class MainActivity extends AppCompatActivity {
         pause(); if (busy) return; libraryOpen=true;busy=true;render();
         io.execute(() -> {
             List<BookStore.Entry> entries=new BookStore(getFilesDir()).entries();
-            runOnUiThread(() -> {if(!isDestroyed()){busy=false;libraryEntries=entries;render();}});
+            List<PhoneScanner.FoundFile> files=PhoneScanner.load(this);
+            runOnUiThread(() -> {if(!isDestroyed()){busy=false;libraryEntries=entries;phoneFiles=files;render();}});
         });
     }
     String sourceName(Uri uri){
@@ -278,7 +286,37 @@ public class MainActivity extends AppCompatActivity {
         }catch(Exception ignored){}
         return "";
     }
-    void closeLibrary(){pendingScanRoots=Collections.emptyList();if(scanning)scanCancelled.set(true);libraryOpen=false;render();}
+    void closeLibrary(){pendingScanRoots=Collections.emptyList();pendingPhoneScan=false;if(scanning)scanCancelled.set(true);libraryOpen=false;render();}
+    boolean hasPhoneAccess(){return Build.VERSION.SDK_INT>=30?Environment.isExternalStorageManager():androidx.core.content.ContextCompat.checkSelfPermission(this,android.Manifest.permission.READ_EXTERNAL_STORAGE)==android.content.pm.PackageManager.PERMISSION_GRANTED;}
+    void scanPhone(){
+        if(busy)return;pause();
+        if(hasPhoneAccess()){startPhoneScan(PhoneScanner.roots(this));return;}
+        pendingPhoneAccess=true;
+        if(Build.VERSION.SDK_INT>=30){
+            try{startActivityForResult(new Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,Uri.parse("package:"+getPackageName())),PHONE_ACCESS);}
+            catch(ActivityNotFoundException absent){try{startActivityForResult(new Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION),PHONE_ACCESS);}catch(ActivityNotFoundException missing){pendingPhoneAccess=false;folderError();}}
+        }else androidx.core.app.ActivityCompat.requestPermissions(this,new String[]{android.Manifest.permission.READ_EXTERNAL_STORAGE},PHONE_READ);
+    }
+    @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] grants){super.onRequestPermissionsResult(code,permissions,grants);if(code==PHONE_READ){pendingPhoneAccess=false;if(hasPhoneAccess())startPhoneScan(PhoneScanner.roots(this));else{libraryMessage=tr("Phone access was not granted. Choose a folder instead.","Доступ к памяти не предоставлен. Выберите отдельную папку.");render();}}}
+    void startPhoneScan(List<File> roots){
+        if(busy){if(!scanning)pendingPhoneScan=true;return;}
+        pause();libraryOpen=true;phoneFilesOpen=true;phoneScanning=true;scanning=true;busy=true;libraryQuery="";scanCancelled=new AtomicBoolean();AtomicBoolean cancellation=scanCancelled;render();
+        io.execute(() -> {
+            PhoneScanner.Scan result=PhoneScanner.scan(getApplicationContext(),roots,cancellation,snapshot -> runOnUiThread(() -> {if(!isDestroyed()&&libraryOpen&&libraryStatus!=null)libraryStatus.setText(scanSummary(snapshot,false));}));
+            List<BookStore.Entry> entries=new BookStore(getFilesDir()).entries();
+            runOnUiThread(() -> {if(!isDestroyed()){phoneScanning=false;scanning=false;busy=false;if(!result.files.isEmpty()||!result.stats.cancelled)phoneFiles=result.files;libraryEntries=entries;libraryMessage=scanSummary(result.stats,true);render();}});
+        });
+    }
+    void openFound(PhoneScanner.FoundFile file){
+        if(busy)return;busy=true;libraryList.setEnabled(false);libraryStatus.setText(tr("Opening…","Открытие книги…"));
+        io.execute(() -> {try{
+            Book selected;
+            File cached=new File(getFilesDir(),file.bookId+".json");
+            if(!file.bookId.isEmpty()&&cached.isFile())selected=Book.load(cached);
+            else try(InputStream input=new FileInputStream(file.path)){selected=Book.parse(input);new BookStore(getFilesDir()).add(selected,file.name());}
+            Book opened=selected;runOnUiThread(() -> {if(!isDestroyed()){busy=false;libraryOpen=false;select(opened);}});
+        }catch(Exception error){runOnUiThread(() -> {if(!isDestroyed()){busy=false;render();failure(error);}});}});
+    }
     void chooseScanFolder(){
         if(busy)return;pause();
         Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
@@ -297,7 +335,7 @@ public class MainActivity extends AppCompatActivity {
             .setPositiveButton(tr("OK","Понятно"),null).show();
     }
     void startScan(List<Uri> roots){
-        if(busy){if(!scanning)pendingScanRoots=new ArrayList<>(roots);return;}pause();libraryOpen=true;scanning=true;busy=true;scanCancelled=new AtomicBoolean();AtomicBoolean cancellation=scanCancelled;render();
+        if(busy){if(!scanning)pendingScanRoots=new ArrayList<>(roots);return;}pause();libraryOpen=true;phoneFilesOpen=false;scanning=true;busy=true;scanCancelled=new AtomicBoolean();AtomicBoolean cancellation=scanCancelled;render();
         io.execute(() -> {
             LibraryScanner.Result result=LibraryScanner.scan(getApplicationContext(),roots,cancellation,snapshot -> runOnUiThread(() -> {
                 if(!isDestroyed()&&libraryOpen&&libraryStatus!=null)libraryStatus.setText(scanSummary(snapshot,false));
@@ -308,35 +346,55 @@ public class MainActivity extends AppCompatActivity {
     }
     String scanSummary(LibraryScanner.Result r,boolean complete){
         String heading=complete?(r.cancelled?tr("Scan stopped","Сканирование остановлено"):r.limited?tr("Scan limit reached; choose a smaller folder","Лимит сканирования; выберите папку поменьше"):tr("Scan complete","Сканирование завершено")):tr("Scanning…","Поиск книг…");
-        if(r.unavailable>0)heading=tr("Select folders again. Unavailable: ","Выберите папки заново. Недоступно: ")+r.unavailable;
+        if(r.unavailable>0)heading=phoneFilesOpen?tr("Protected or unavailable folders: ","Закрытых или недоступных папок: ")+r.unavailable:tr("Select folders again. Unavailable: ","Выберите папки заново. Недоступно: ")+r.unavailable;
         return heading+"\n"+tr("Added: ","Добавлено: ")+r.added+tr(" · Duplicates: "," · Дубли: ")+r.duplicates+tr(" · Skipped: "," · Пропущено: ")+r.failed+
             "\n"+tr("Checked: ","Проверено: ")+r.examined+" · FB2: "+r.found+
             (!complete&&!r.current.isEmpty()?"\n"+r.current:"");
     }
     void libraryScreen(){
-        header(tr("Library","Библиотека"),button(tr("Read","Читать"),this::closeLibrary));
-        MaterialButton scan=button(scanning?tr("Stop scan","Остановить"):tr("Find FB2","Найти FB2"),() -> {if(scanning){scanCancelled.set(true);}else chooseScanFolder();});scan.setEnabled(scanning||!busy);
-        primary(scan);MaterialButton again=button(tr("Scan again","Повторить"),this::scanAgain);again.setEnabled(!busy);row(root,scan,again);
         boolean compactLibrary=getResources().getConfiguration().screenHeightDp<500;
-        if(!compactLibrary)root.addView(text(tr("Choose a book folder. All subfolders are scanned. Add more folders whenever you need.","Выберите папку с книгами. Поиск включает все подпапки. Можно добавить несколько папок."),14));
+        header(phoneFilesOpen?tr("Found FB2","Найденные FB2"):tr("Library","Библиотека"),button(tr("Read","Читать"),this::closeLibrary));
+        MaterialButton phone=button(scanning?tr("Stop scan","Остановить"):tr("Scan phone","Сканировать телефон"),() -> {if(scanning)scanCancelled.set(true);else scanPhone();});primary(phone);phone.setEnabled(scanning||!busy);
+        MaterialButton files=button(compactLibrary?tr("More","Ещё"):phoneFilesOpen?tr("Books","Книги"):tr("Found files","Найденные файлы"),() -> {});files.setEnabled(!busy);
+        files.setOnClickListener(v -> {if(compactLibrary)libraryMenu(v);else toggleFoundFiles();});row(root,phone,files);
+        if(!compactLibrary){
+            MaterialButton scan=button(tr("Find FB2","Найти FB2"),this::chooseScanFolder);scan.setEnabled(!busy);
+            MaterialButton again=button(tr("Scan again","Повторить"),this::scanAgain);again.setEnabled(!busy);row(root,scan,again);
+            root.addView(text(phoneFilesOpen?tr("Tap a title to read. Shared phone storage and SD cards are scanned; private app folders are excluded.","Нажмите название, чтобы читать. Поиск по общей памяти и SD-картам; приватные папки приложений исключены."):tr("Scan your phone, or choose a book folder. Found books are saved for offline reading.","Сканируйте телефон или выберите папку. Найденные книги сохраняются для чтения без интернета."),14));
+        }
         librarySearch=new EditText(this);librarySearch.setSingleLine(true);field(librarySearch);
-        librarySearch.setHint(tr("Search title, author or series","Название, автор или серия"));librarySearch.setContentDescription(tr("Search library","Поиск по библиотеке"));librarySearch.setText(libraryQuery);root.addView(librarySearch);
-        libraryStatus=text(scanning?tr("Scanning…","Поиск книг…"):busy?tr("Loading library…","Загрузка библиотеки…"):libraryMessage.isEmpty()?tr("Books: ","Книг: ")+libraryEntries.size():libraryMessage,14);
+        librarySearch.setHint(phoneFilesOpen?tr("Search title or filename","Название книги или имя файла"):tr("Search title, author or series","Название, автор или серия"));librarySearch.setContentDescription(tr("Search library","Поиск по библиотеке"));librarySearch.setText(libraryQuery);root.addView(librarySearch);
+        libraryStatus=text(scanning?tr("Scanning…","Поиск книг…"):busy?tr("Loading library…","Загрузка библиотеки…"):libraryMessage.isEmpty()?(phoneFilesOpen?tr("Files: ","Файлов: ")+phoneFiles.size():tr("Books: ","Книг: ")+libraryEntries.size()):libraryMessage,14);
         libraryStatus.setMaxLines(compactLibrary?2:5);root.addView(libraryStatus);
         android.widget.FrameLayout listFrame=new android.widget.FrameLayout(this);root.addView(listFrame,new LinearLayout.LayoutParams(-1,0,1));
         libraryList=new ListView(this);libraryList.setDivider(new android.graphics.drawable.ColorDrawable(RULE));libraryList.setDividerHeight(dp(1));libraryList.setEnabled(!busy);listFrame.addView(libraryList,new android.widget.FrameLayout.LayoutParams(-1,-1));
         libraryEmpty=text("",16);libraryEmpty.setGravity(Gravity.CENTER);listFrame.addView(libraryEmpty,new android.widget.FrameLayout.LayoutParams(-1,-1));libraryList.setEmptyView(libraryEmpty);
-        libraryAdapter=new LibraryAdapter();libraryList.setAdapter(libraryAdapter);refreshLibraryList();
+        libraryAdapter=new LibraryAdapter();foundAdapter=new FoundAdapter();libraryList.setAdapter(phoneFilesOpen?foundAdapter:libraryAdapter);refreshLibraryList();
         librarySearch.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){libraryQuery=s.toString();refreshLibraryList();}public void afterTextChanged(Editable e){}});
         libraryList.setOnItemClickListener((parent,view,index,id) -> {
-            if(busy)return;BookStore.Entry entry=libraryAdapter.filtered.get(index);busy=true;libraryStatus.setText(tr("Opening…","Открытие книги…"));
+            if(busy)return;if(phoneFilesOpen){openFound(foundAdapter.filtered.get(index));return;}BookStore.Entry entry=libraryAdapter.filtered.get(index);busy=true;libraryStatus.setText(tr("Opening…","Открытие книги…"));
             io.execute(() -> {try{Book selected=Book.load(new File(getFilesDir(),entry.id+".json"));runOnUiThread(() -> {if(!isDestroyed()){busy=false;libraryOpen=false;select(selected);}});}
                 catch(Exception error){runOnUiThread(() -> {if(!isDestroyed()){busy=false;render();failure(error);}});}});
         });
     }
+    void toggleFoundFiles(){phoneFilesOpen=!phoneFilesOpen;libraryQuery="";libraryMessage="";render();}
+    void libraryMenu(View anchor){PopupMenu menu=new PopupMenu(this,anchor);menu.getMenu().add(tr("Choose folder","Выбрать папку")).setOnMenuItemClickListener(item -> {chooseScanFolder();return true;});menu.getMenu().add(tr("Scan folders again","Повторить поиск в папках")).setOnMenuItemClickListener(item -> {scanAgain();return true;});menu.getMenu().add(phoneFilesOpen?tr("Books","Книги"):tr("Found files","Найденные файлы")).setOnMenuItemClickListener(item -> {toggleFoundFiles();return true;});menu.show();}
     void refreshLibraryList(){
+        if(phoneFilesOpen){foundAdapter.filtered.clear();for(PhoneScanner.FoundFile file:phoneFiles)if(file.matches(libraryQuery))foundAdapter.filtered.add(file);foundAdapter.notifyDataSetChanged();libraryEmpty.setText(busy?tr("Scanning phone…","Сканирование телефона…"):phoneFiles.isEmpty()?tr("No files yet. Tap Scan phone.","Файлов пока нет. Нажмите «Сканировать телефон»."):tr("No matching files","Файлы не найдены"));return;}
         libraryAdapter.filtered.clear();for(BookStore.Entry entry:libraryEntries)if(entry.matches(libraryQuery))libraryAdapter.filtered.add(entry);
         libraryAdapter.notifyDataSetChanged();libraryEmpty.setText(busy?tr("Preparing your library…","Подготовка библиотеки…"):libraryEntries.isEmpty()?tr("No books yet. Tap Find FB2 to scan a folder.","Пока нет книг. Нажмите «Найти FB2» и выберите папку."):tr("No matching books","Книги не найдены"));
+    }
+    final class FoundAdapter extends BaseAdapter {
+        final List<PhoneScanner.FoundFile> filtered=new ArrayList<>();
+        public int getCount(){return filtered.size();}public Object getItem(int position){return filtered.get(position);}public long getItemId(int position){return position;}
+        public View getView(int index,View recycled,android.view.ViewGroup parent){
+            LinearLayout item=vertical();item.setPadding(dp(4),dp(12),dp(4),dp(12));PhoneScanner.FoundFile file=filtered.get(index);
+            TextView title=text(file.title,22);title.setTypeface(Typeface.create("serif",Typeface.NORMAL));title.setMaxLines(2);title.setEllipsize(android.text.TextUtils.TruncateAt.END);item.addView(title);
+            if(!file.author.isEmpty())item.addView(text(file.author,15));
+            TextView path=text(file.path,12);path.setMaxLines(2);path.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);item.addView(path);
+            if(file.bookId.isEmpty())item.addView(text(tr("Could not import · tap to retry","Не удалось добавить · нажмите для повтора"),12));
+            item.setContentDescription(file.title+". "+file.path);return item;
+        }
     }
     final class LibraryAdapter extends BaseAdapter {
         final List<BookStore.Entry> filtered=new ArrayList<>();
@@ -408,6 +466,6 @@ public class MainActivity extends AppCompatActivity {
     @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused){systemBars();if(root!=null)root.post(this::systemBars);}}
     @Override public void onConfigurationChanged(android.content.res.Configuration configuration){super.onConfigurationChanged(configuration);systemBars();if(root!=null)root.post(this::systemBars);}
     @Override protected void onPause(){pause(); saveSettings(); super.onPause();}
-    @Override protected void onSaveInstanceState(Bundle out){out.putBoolean("libraryOpen",libraryOpen);out.putBoolean("scanning",scanning);out.putString("libraryQuery",libraryQuery);super.onSaveInstanceState(out);}
+    @Override protected void onSaveInstanceState(Bundle out){out.putBoolean("libraryOpen",libraryOpen);out.putBoolean("phoneFilesOpen",phoneFilesOpen);out.putBoolean("pendingPhoneAccess",pendingPhoneAccess);out.putBoolean("scanning",scanning);out.putString("libraryQuery",libraryQuery);super.onSaveInstanceState(out);}
     @Override protected void onDestroy(){scanCancelled.set(true);handler.removeCallbacksAndMessages(null); io.shutdownNow(); super.onDestroy();}
 }

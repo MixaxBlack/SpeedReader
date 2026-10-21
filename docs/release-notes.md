@@ -9,9 +9,9 @@ Native offline Android FB2 speed reader. Android 8.0 and newer.
 
 Signed release APK. CI builds and lints, runs parser and reader instrumentation tests on Android 15, installs and launches the actual release APK, verifies its signature and publishes SHA256SUMS.
 
-Download SpeedReader-1.2.3.apk below and allow installation from your browser when Android asks.
+Download SpeedReader-1.3.0.apk below and allow installation from your browser when Android asks.
 
-Vertical speed slider beside the word; +1/−1 buttons for exact speed selection.
+Full-width word area. Tap the speed value to access the vertical speed slider in Appearance; +1/−1 stay on the reader. Long words temporarily shrink to fit, then the next word uses the preferred size again.
 
 New library scanner: Library → Find FB2. Choose one or more book folders through Android, scan subfolders, and repeat scans without duplicates. Read title, author, series, genre and language from FB2 files. Search the library, see word counts/progress, stop scanning and keep already imported books. Malformed/inaccessible files are reported and skipped. Book copies remain available offline. Original files are read only; no all-files permission is requested.
 
