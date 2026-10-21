@@ -123,7 +123,7 @@ public class MainActivity extends AppCompatActivity {
     void divider(LinearLayout parent){View line=new View(this);line.setBackgroundColor(RULE);parent.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));}
     void section(LinearLayout parent,String label){TextView heading=text(label,18);heading.setFontVariationSettings("'wght' 600");heading.setPadding(0,dp(24),0,dp(8));parent.addView(heading);}
     void styleSlider(Slider slider){slider.setTickVisible(false);slider.setTrackActiveTintList(ColorStateList.valueOf(ACCENT));slider.setTrackInactiveTintList(ColorStateList.valueOf(RULE));slider.setThumbTintList(ColorStateList.valueOf(ACCENT));}
-    boolean darkNavigation(){return Build.VERSION.SDK_INT<27||(android.content.res.Resources.getSystem().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;}
+    boolean darkNavigation(){return Build.VERSION.SDK_INT<27||(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;}
     void systemBars(){
         if(root==null)return;boolean dark=darkNavigation();
         androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),root);
