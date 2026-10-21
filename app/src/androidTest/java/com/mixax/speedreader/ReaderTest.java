@@ -107,10 +107,11 @@ public class ReaderTest {
             Thread.sleep(1500);
             final Book[] original=new Book[1];final int[] old=new int[3];
             scenario.onActivity(a -> {a.pause();original[0]=a.book;old[0]=a.fontSize;old[1]=a.font;old[2]=a.position;});
+            Book fitting=new Book("Word fitting",Arrays.asList(String.join("",Collections.nCopies(12,"длинноеслово")),"book"));
             try{
                 for(int face=0;face<4;face++){
                     final int selected=face;
-                    scenario.onActivity(a -> {a.fontSize=72;a.font=selected;a.book=new Book("Word fitting",Arrays.asList(String.join("",Collections.nCopies(12,"длинноеслово")),"book"));a.position=0;a.render();});
+                    scenario.onActivity(a -> {a.fontSize=72;a.font=selected;a.book=fitting;a.position=0;a.render();});
                     InstrumentationRegistry.getInstrumentation().waitForIdleSync();Thread.sleep(150);
                     scenario.onActivity(a -> {
                         float preferred=android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,72,a.getResources().getDisplayMetrics());
