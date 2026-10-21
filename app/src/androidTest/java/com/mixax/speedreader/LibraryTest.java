@@ -25,7 +25,12 @@ public class LibraryTest {
         File directory=new File(context().getCacheDir(),"library-"+UUID.randomUUID());assertTrue(directory.mkdirs());
         return new ContextWrapper(context()){@Override public File getFilesDir(){return directory;}};
     }
-    @Before public void accessTestProvider(){InstrumentationRegistry.getInstrumentation().getUiAutomation().adoptShellPermissionIdentity("android.permission.MANAGE_DOCUMENTS");}
+    @Before public void accessTestProvider(){
+        InstrumentationRegistry.getInstrumentation().getUiAutomation().adoptShellPermissionIdentity("android.permission.MANAGE_DOCUMENTS");
+        try(android.database.Cursor cursor=context().getContentResolver().query(DocumentsContract.buildChildDocumentsUriUsingTree(tree("root"),"root"),null,null,null,null)){
+            assertNotNull("Test document provider must be reachable",cursor);assertEquals(6,cursor.getCount());
+        }
+    }
     @After public void releaseTestProvider(){InstrumentationRegistry.getInstrumentation().getUiAutomation().dropShellPermissionIdentity();}
     @Test public void metadataAuthorsAndOldCacheCompatibility() throws Exception {
         String xml=FixtureDocumentsProvider.book("Метаданные","Анна","Петрова","Цикл","UTF-8").replace("</title-info>","<author><nickname>Second Author</nickname></author></title-info>");

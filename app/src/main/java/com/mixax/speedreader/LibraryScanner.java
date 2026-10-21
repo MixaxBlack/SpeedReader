@@ -49,7 +49,7 @@ public final class LibraryScanner {
                     }catch(Exception invalid){if(stopped(cancel))break;result.failed++;}
                     observer.update(result.snapshot());
                 }
-            }catch(Exception denied){if(!stopped(cancel))result.unavailable++;}
+            }catch(Exception denied){if(!stopped(cancel)){result.unavailable++;android.util.Log.w("SpeedReaderScan","Unable to query granted folder",denied);}}
         }
         result.cancelled=stopped(cancel);result.current="";observer.update(result.snapshot());return result;
     }
