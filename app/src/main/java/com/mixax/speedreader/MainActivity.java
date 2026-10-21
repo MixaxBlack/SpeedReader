@@ -42,7 +42,7 @@ public class MainActivity extends AppCompatActivity {
     boolean backdropDark;
     int backdropLeft=-1,backdropRight=-1,backdropBottom=-1;
     TextView word, progress, bookTitle, state, speedValue;
-    MaterialButton play, faster, slower;
+    MaterialButton play, faster, slower,rotateButton;
     VerticalSpeedBar speedControl;
     Slider seek;
     boolean libraryOpen,scanning;
@@ -171,7 +171,10 @@ public class MainActivity extends AppCompatActivity {
         header("SpeedReader",button(tr("Appearance", "Оформление"), () -> { pause(); settings = true; render(); }));
         bookTitle = text(book == null ? tr("Your reading space", "Ваше пространство чтения") : book.title, 18);
         bookTitle.setTypeface(Typeface.create("serif",Typeface.NORMAL));bookTitle.setTextSize(21);bookTitle.setPadding(0,dp(16),0,dp(12));bookTitle.setMaxLines(2); root.addView(bookTitle);
-        row(root, button(tr("Open FB2", "Открыть FB2"), this::open), button(tr("Library", "Библиотека"), this::library));
+        LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER_VERTICAL);
+        for(MaterialButton action:new MaterialButton[]{button(tr("Open FB2", "Открыть FB2"),this::open),button(tr("Library", "Библиотека"),this::library)}){LinearLayout.LayoutParams cell=new LinearLayout.LayoutParams(0,-2,1);cell.setMargins(dp(4),0,dp(4),0);actions.addView(action,cell);}
+        rotateButton=button("",this::rotateScreen);rotateButton.setIcon(androidx.appcompat.content.res.AppCompatResources.getDrawable(this,R.drawable.ic_rotate));rotateButton.setIconSize(dp(24));rotateButton.setIconPadding(0);rotateButton.setIconTint(rotateButton.getTextColors());rotateButton.setContentDescription(tr("Rotate screen","Повернуть экран"));rotateButton.setTooltipText(tr("Rotate screen","Повернуть экран"));
+        LinearLayout.LayoutParams rotateCell=new LinearLayout.LayoutParams(dp(48),dp(48));rotateCell.setMargins(dp(4),0,dp(4),0);actions.addView(rotateButton,rotateCell);root.addView(actions);
         LinearLayout stage = vertical(); stage.setGravity(Gravity.CENTER); stage.setPadding(dp(12),0,dp(12),0);
         GradientDrawable surface = new GradientDrawable(); surface.setColor(background); surface.setCornerRadius(dp(8)); stage.setBackground(surface);
         LinearLayout readingArea = new LinearLayout(this);
@@ -221,6 +224,7 @@ public class MainActivity extends AppCompatActivity {
         speedValue.setText(speed+tr(" words / min"," слов / мин"));
         speedValue.setContentDescription(speedValue.getText()+tr(". Tap to change reading speed",". Нажмите для изменения скорости"));
         faster.setEnabled(speed<500);slower.setEnabled(speed>30);
+        rotateButton.setEnabled(!busy);
         ((FittingWordView)word).showWord(busy ? tr("Loading…", "Загрузка…") : book == null ? "SpeedReader" : book.words.get(position),fontSize);
         word.setContentDescription(tr("Current word. Tap to pause or resume. ", "Текущее слово. Нажмите для паузы или продолжения. ") + word.getText());
         state.setText(busy ? tr("Preparing your book", "Подготовка книги") : playing ? tr("Reading · tap to pause", "Чтение · нажмите для паузы") : tr("Paused · tap to read", "Пауза · нажмите для чтения"));
@@ -237,6 +241,7 @@ public class MainActivity extends AppCompatActivity {
         else { if (position == book.words.size()-1) position = 0; playing = true; getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); handler.postDelayed(tick,60000L/speed); }
         update();
     }
+    void rotateScreen(){pause();setRequestedOrientation(getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT?android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE:android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);}
     void pause() { playing = false; handler.removeCallbacks(tick); getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); savePosition(); update(); }
     void move(int offset) { if (book == null) return; pause(); position = Math.max(0,Math.min(book.words.size()-1,position+offset)); update(); savePosition(); }
     void savePosition() { if (book != null) prefs.edit().putInt("pos_"+book.id,position).putString("last",book.id).apply(); }

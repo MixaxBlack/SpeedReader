@@ -153,6 +153,19 @@ public class ReaderTest {
             }
         }finally{shell("settings put system font_scale 1.0");preferences.edit().putString("language",previousLanguage).apply();}
     }
+    @Test public void manualRotationWorksWithSystemAutoRotateOff() throws Exception {
+        shell("settings put system accelerometer_rotation 0");shell("settings put system user_rotation 0");
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            Thread.sleep(1500);final int[] preferred={0};
+            scenario.onActivity(a -> {a.position=3;preferred[0]=a.fontSize;a.savePosition();a.toggle();a.rotateButton.performClick();});Thread.sleep(1400);
+            scenario.onActivity(a -> {assertEquals(android.content.res.Configuration.ORIENTATION_LANDSCAPE,a.getResources().getConfiguration().orientation);assertEquals(3,a.position);assertEquals(preferred[0],a.fontSize);assertFalse(a.playing);});screenshot("reader-rotated.png");
+            scenario.onActivity(a -> {assertTrue(a.root.getParent() instanceof android.widget.ScrollView);((android.widget.ScrollView)a.root.getParent()).fullScroll(android.view.View.FOCUS_DOWN);});Thread.sleep(250);
+            scenario.onActivity(a -> {android.graphics.Rect visible=new android.graphics.Rect();assertTrue(a.play.getGlobalVisibleRect(visible));});screenshot("reader-rotated-controls.png");
+            scenario.onActivity(a -> ((android.widget.ScrollView)a.root.getParent()).fullScroll(android.view.View.FOCUS_UP));Thread.sleep(250);
+            scenario.onActivity(a -> a.rotateButton.performClick());Thread.sleep(1400);
+            scenario.onActivity(a -> {assertEquals(android.content.res.Configuration.ORIENTATION_PORTRAIT,a.getResources().getConfiguration().orientation);assertEquals(3,a.position);assertEquals(preferred[0],a.fontSize);a.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);});
+        }
+    }
     void shell(String command) throws Exception {
         try(android.os.ParcelFileDescriptor descriptor=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand(command);
             InputStream output=new android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor)){
