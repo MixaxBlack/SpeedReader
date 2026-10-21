@@ -2,6 +2,8 @@ package com.mixax.speedreader;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -94,6 +96,36 @@ public class ReaderTest {
                 a.saveSettings();
             });
             scenario.recreate();Thread.sleep(1000);scenario.onActivity(a -> {assertEquals(138,a.speed);assertEquals(138,a.speedControl.getProgress());a.changeSpeed(300);});
+        }
+    }
+    @Test public void largeSystemFontKeepsTransportLabelsSeparate() throws Exception {
+        Context context=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        android.content.SharedPreferences preferences=context.getSharedPreferences("reader",Context.MODE_PRIVATE);
+        String previousLanguage=preferences.getString("language","system");
+        shell("settings put system font_scale 1.3");
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            Thread.sleep(1500);
+            for(String language:new String[]{"en","ru"}){
+                scenario.onActivity(a -> {a.pause();a.language=language;a.render();});
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync();Thread.sleep(250);
+                scenario.onActivity(a -> {
+                    assertTrue(a.getResources().getConfiguration().fontScale>1.15f);
+                    assertTrue("Read has its own wide row",a.play.getWidth()>a.faster.getWidth()*2);
+                    LinearLayout steps=(LinearLayout)a.root.getChildAt(a.root.getChildCount()-2);
+                    for(int i=0;i<steps.getChildCount();i++){
+                        TextView label=(TextView)steps.getChildAt(i);
+                        assertTrue("Step labels fit independently",label.getPaint().measureText(label.getText().toString())<=label.getWidth()-label.getPaddingLeft()-label.getPaddingRight());
+                        assertTrue(label.getHeight()>=a.dp(48));
+                    }
+                });
+                if(language.equals("ru"))screenshot("phone-ru-large-font.png");
+            }
+        }finally{shell("settings put system font_scale 1.0");preferences.edit().putString("language",previousLanguage).apply();}
+    }
+    void shell(String command) throws Exception {
+        try(android.os.ParcelFileDescriptor descriptor=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand(command);
+            InputStream output=new android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor)){
+            byte[] buffer=new byte[1024];while(output.read(buffer)!=-1){}
         }
     }
     void touch(VerticalSpeedBar bar,int action,float y){

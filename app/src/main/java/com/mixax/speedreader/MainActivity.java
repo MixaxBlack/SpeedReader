@@ -66,7 +66,7 @@ public class MainActivity extends AppCompatActivity {
     int dp(float n) { return Math.round(n * getResources().getDisplayMetrics().density); }
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
-        uiFace=getResources().getFont(R.font.manrope);
+        uiFace=getResources().getFont(R.font.ui_regular);
         prefs = getSharedPreferences("reader", MODE_PRIVATE);
         libraryOpen=saved!=null&&saved.getBoolean("libraryOpen",false);
         libraryQuery=saved==null?"":saved.getString("libraryQuery","");
@@ -104,7 +104,7 @@ public class MainActivity extends AppCompatActivity {
     LinearLayout vertical() { LinearLayout l = new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l; }
     MaterialButton button(String label, Runnable action) {
         MaterialButton b = new MaterialButton(this); b.setText(label); b.setAllCaps(false); b.setMinHeight(dp(48));
-        b.setTypeface(uiFace);b.setTextSize(14);b.setCornerRadius(dp(6));b.setElevation(0);b.setStateListAnimator(null);b.setLetterSpacing(0);
+        b.setTypeface(uiFace);b.setFontVariationSettings("'wght' 550");b.setTextSize(14);b.setCornerRadius(dp(6));b.setElevation(0);b.setStateListAnimator(null);b.setLetterSpacing(0);
         b.setPadding(dp(10),0,dp(10),0);b.setInsetTop(dp(4));b.setInsetBottom(dp(4));
         b.setBackgroundTintList(new ColorStateList(new int[][]{new int[]{-android.R.attr.state_enabled},new int[]{}},new int[]{0xFFE9EAE4,PAPER}));
         b.setTextColor(new ColorStateList(new int[][]{new int[]{-android.R.attr.state_enabled},new int[]{}},new int[]{0xFF777B73,INK}));
@@ -118,7 +118,9 @@ public class MainActivity extends AppCompatActivity {
         bar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));bar.addView(action,new LinearLayout.LayoutParams(-2,-2));root.addView(bar);divider(root);
     }
     void divider(LinearLayout parent){View line=new View(this);line.setBackgroundColor(RULE);parent.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));}
-    void section(LinearLayout parent,String label){TextView heading=text(label,18);heading.setTypeface(uiFace,Typeface.BOLD);heading.setPadding(0,dp(24),0,dp(8));parent.addView(heading);}
+    void section(LinearLayout parent,String label){TextView heading=text(label,18);heading.setFontVariationSettings("'wght' 600");heading.setPadding(0,dp(24),0,dp(8));parent.addView(heading);}
+    void styleSlider(Slider slider){slider.setTickVisible(false);slider.setTrackActiveTintList(ColorStateList.valueOf(ACCENT));slider.setTrackInactiveTintList(ColorStateList.valueOf(RULE));slider.setThumbTintList(ColorStateList.valueOf(ACCENT));}
+    void systemBars(){if(root==null)return;androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),root);bars.setAppearanceLightStatusBars(true);bars.setAppearanceLightNavigationBars(Build.VERSION.SDK_INT>=27);if(Build.VERSION.SDK_INT>=29){getWindow().setNavigationBarContrastEnforced(false);getWindow().getDecorView().setForceDarkAllowed(false);}}
     void field(EditText field){field.setTypeface(uiFace);field.setTextColor(INK);field.setHintTextColor(MUTED);field.setMinHeight(dp(52));field.setTextSize(16);field.setPadding(dp(14),dp(8),dp(14),dp(8));GradientDrawable fill=new GradientDrawable();fill.setColor(Color.WHITE);fill.setCornerRadius(dp(8));fill.setStroke(dp(1),RULE);field.setBackground(fill);}
     void row(LinearLayout parent, View... views) {
         LinearLayout l = new LinearLayout(this); l.setGravity(Gravity.CENTER_VERTICAL);
@@ -133,8 +135,9 @@ public class MainActivity extends AppCompatActivity {
         } else setContentView(root);
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.ime());
-            v.setPadding(dp(20)+bars.left, bars.top, dp(20)+bars.right, bars.bottom); return insets;
+            v.setPadding(dp(20)+bars.left, bars.top, dp(20)+bars.right, bars.bottom);systemBars();return insets;
         });
+        systemBars();root.post(this::systemBars);
         ViewCompat.requestApplyInsets(root);
         if (settings) { settingsScreen(); return; }
         if(libraryOpen){libraryScreen();return;}
@@ -173,10 +176,12 @@ public class MainActivity extends AppCompatActivity {
         speedRow.addView(faster,new LinearLayout.LayoutParams(dp(64),dp(48)));root.addView(speedRow);
         progress = text("",14); progress.setGravity(Gravity.CENTER); root.addView(progress);
         seek = new Slider(this); seek.setValueFrom(0); seek.setValueTo(1000); seek.setStepSize(1); seek.setContentDescription(tr("Reading position", "Позиция чтения"));
-        seek.setTickVisible(false);seek.setTrackActiveTintList(ColorStateList.valueOf(ACCENT));seek.setTrackInactiveTintList(ColorStateList.valueOf(RULE));seek.setThumbTintList(ColorStateList.valueOf(ACCENT));
+        styleSlider(seek);
         seek.addOnChangeListener((s,v,user) -> { if (user && book != null) { pause(); position = Math.round(v / 1000f * (book.words.size()-1)); update(); savePosition(); } }); root.addView(seek);
         play = button("", this::toggle);primary(play);
-        row(root, button(tr("Back 10", "Назад 10"), () -> move(-10)), play, button(tr("Forward 10", "Вперёд 10"), () -> move(10)));
+        MaterialButton back=button(tr("Back 10", "Назад 10"), () -> move(-10)),forward=button(tr("Forward 10", "Вперёд 10"), () -> move(10));
+        if(getResources().getConfiguration().fontScale>1.15f||getResources().getConfiguration().screenWidthDp<360){row(root,back,forward);root.addView(play,new LinearLayout.LayoutParams(-1,dp(52)));}
+        else row(root,back,play,forward);
         update();
     }
     void changeSpeed(int requested) {
@@ -190,6 +195,7 @@ public class MainActivity extends AppCompatActivity {
     void slider(LinearLayout parent,int from,int to,int step,int initial,NumberAction change,NumberLabel label) {
         TextView value = text(label.label(initial),14); parent.addView(value);
         Slider slider = new Slider(this); slider.setValueFrom(from); slider.setValueTo(to); slider.setStepSize(step); slider.setValue(initial);
+        styleSlider(slider);
         slider.setContentDescription(label.label(initial));
         slider.addOnChangeListener((s,n,user) -> { if (user) { int i = Math.round(n); value.setText(label.label(i)); slider.setContentDescription(label.label(i)); change.accept(i); } }); parent.addView(slider);
     }
@@ -375,6 +381,7 @@ public class MainActivity extends AppCompatActivity {
         for(int i=0;i<labels.length;i++){RadioButton b=new RadioButton(this); b.setId(View.generateViewId()); b.setText(labels[i]);b.setTypeface(uiFace);b.setTextSize(16);b.setTextColor(INK); b.setMinHeight(dp(48)); group.addView(b); if(i==current)group.check(b.getId());}
         group.setOnCheckedChangeListener((g,id) -> action.accept(g.indexOfChild(g.findViewById(id)))); parent.addView(group);
     }
+    @Override protected void onResume(){super.onResume();systemBars();if(root!=null)root.post(this::systemBars);}
     @Override protected void onPause(){pause(); saveSettings(); super.onPause();}
     @Override protected void onSaveInstanceState(Bundle out){out.putBoolean("libraryOpen",libraryOpen);out.putBoolean("scanning",scanning);out.putString("libraryQuery",libraryQuery);super.onSaveInstanceState(out);}
     @Override protected void onDestroy(){scanCancelled.set(true);handler.removeCallbacksAndMessages(null); io.shutdownNow(); super.onDestroy();}
