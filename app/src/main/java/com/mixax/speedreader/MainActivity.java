@@ -272,8 +272,9 @@ public class MainActivity extends AppCompatActivity {
     }
     String scanSummary(LibraryScanner.Result r,boolean complete){
         String heading=complete?(r.cancelled?tr("Scan stopped","Сканирование остановлено"):r.limited?tr("Scan limit reached; choose a smaller folder","Лимит сканирования; выберите папку поменьше"):tr("Scan complete","Сканирование завершено")):tr("Scanning…","Поиск книг…");
+        if(r.unavailable>0)heading=tr("Select folders again. Unavailable: ","Выберите папки заново. Недоступно: ")+r.unavailable;
         return heading+"\n"+tr("Added: ","Добавлено: ")+r.added+tr(" · Duplicates: "," · Дубли: ")+r.duplicates+tr(" · Skipped: "," · Пропущено: ")+r.failed+
-            "\n"+tr("Checked: ","Проверено: ")+r.examined+" · FB2: "+r.found+(r.unavailable>0?tr(" · Folders unavailable: "," · Недоступно папок: ")+r.unavailable:"")+
+            "\n"+tr("Checked: ","Проверено: ")+r.examined+" · FB2: "+r.found+
             (!complete&&!r.current.isEmpty()?"\n"+r.current:"");
     }
     void libraryScreen(){
@@ -283,8 +284,8 @@ public class MainActivity extends AppCompatActivity {
         boolean compactLibrary=getResources().getConfiguration().screenHeightDp<500;
         if(!compactLibrary)root.addView(text(tr("Choose a book folder. All subfolders are scanned. Add more folders whenever you need.","Выберите папку с книгами. Поиск включает все подпапки. Можно добавить несколько папок."),14));
         librarySearch=new EditText(this);librarySearch.setSingleLine(true);librarySearch.setMinHeight(dp(48));librarySearch.setTextSize(16);librarySearch.setTextColor(Color.rgb(36,46,40));
-        librarySearch.setHint(tr("Search title, author or series","Название, автор или серия"));librarySearch.setContentDescription(tr("Search library","Поиск по библиотеке"));librarySearch.setText(libraryQuery);root.addView(librarySearch);
-        libraryStatus=text(scanning?tr("Scanning…","Поиск книг…"):busy?tr("Loading library…","Загрузка библиотеки…"):libraryMessage.isEmpty()?libraryEntries.size()+tr(" books"," книг"):libraryMessage,14);
+        librarySearch.setHintTextColor(Color.rgb(55,104,89));librarySearch.setHint(tr("Search title, author or series","Название, автор или серия"));librarySearch.setContentDescription(tr("Search library","Поиск по библиотеке"));librarySearch.setText(libraryQuery);root.addView(librarySearch);
+        libraryStatus=text(scanning?tr("Scanning…","Поиск книг…"):busy?tr("Loading library…","Загрузка библиотеки…"):libraryMessage.isEmpty()?tr("Books: ","Книг: ")+libraryEntries.size():libraryMessage,14);
         libraryStatus.setMaxLines(compactLibrary?2:5);root.addView(libraryStatus);
         android.widget.FrameLayout listFrame=new android.widget.FrameLayout(this);root.addView(listFrame,new LinearLayout.LayoutParams(-1,0,1));
         libraryList=new ListView(this);libraryList.setDividerHeight(dp(1));libraryList.setEnabled(!busy);listFrame.addView(libraryList,new android.widget.FrameLayout.LayoutParams(-1,-1));
