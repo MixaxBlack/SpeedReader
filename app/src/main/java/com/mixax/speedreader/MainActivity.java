@@ -172,25 +172,15 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams areaParams = compactHeight ? new LinearLayout.LayoutParams(-1,dp(420)) : new LinearLayout.LayoutParams(-1,0,1);
         areaParams.setMargins(0,dp(16),0,dp(12)); root.addView(readingArea,areaParams);
         readingArea.addView(stage,new LinearLayout.LayoutParams(0,-1,1));
-        LinearLayout rail=vertical();rail.setGravity(Gravity.CENTER_HORIZONTAL);
-        LinearLayout.LayoutParams railParams=new LinearLayout.LayoutParams(dp(64),-1);railParams.setMargins(dp(12),0,0,0);readingArea.addView(rail,railParams);
+        speedControl=null;
         faster=button("+1",() -> changeSpeed(speed+1));faster.setSingleLine(true);faster.setPadding(0,0,0,0);faster.setContentDescription(tr("Faster by 1 word per minute", "Быстрее на 1 слово в минуту"));
-        TextView maximum=text("500",12);maximum.setGravity(Gravity.CENTER);rail.addView(maximum);
-        speedControl=new VerticalSpeedBar(this);speedControl.setProgress(speed);
-        speedControl.setContentDescription(tr("Reading speed, words per minute. Up to increase.","Скорость чтения, слов в минуту. Вверх — быстрее."));
-        speedControl.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
-            public void onProgressChanged(SeekBar bar,int value,boolean user){changeSpeed(value);}
-            public void onStartTrackingTouch(SeekBar bar){}
-            public void onStopTrackingTouch(SeekBar bar){}
-        });rail.addView(speedControl,new LinearLayout.LayoutParams(-1,0,1));
-        TextView minimum=text("30",12);minimum.setGravity(Gravity.CENTER);rail.addView(minimum);
         slower=button("−1",() -> changeSpeed(speed-1));slower.setSingleLine(true);slower.setPadding(0,0,0,0);slower.setContentDescription(tr("Slower by 1 word per minute", "Медленнее на 1 слово в минуту"));
-        word = text("",fontSize); word.setTextColor(foreground); word.setTypeface(Typeface.create(faces[font],Typeface.NORMAL)); word.setGravity(Gravity.CENTER);
-        word.setSingleLine(true); word.setAutoSizeTextTypeUniformWithConfiguration(12,fontSize,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+        word = new FittingWordView(this); word.setTextColor(foreground); word.setTypeface(Typeface.create(faces[font],Typeface.NORMAL)); word.setGravity(Gravity.CENTER);
+        word.setPadding(0,dp(8),0,dp(8));
         word.setMinHeight(dp(64)); word.setFocusable(true); word.setOnClickListener(v -> toggle());
         stage.setOnClickListener(v -> toggle()); stage.addView(word,new LinearLayout.LayoutParams(-1,-2));
         state = text("", 14); state.setTextColor(foreground); state.setGravity(Gravity.CENTER); stage.addView(state);
-        speedValue=text("",16);speedValue.setGravity(Gravity.CENTER);
+        speedValue=text("",16);speedValue.setGravity(Gravity.CENTER);speedValue.setMinHeight(dp(48));speedValue.setTextColor(ACCENT);speedValue.setPaintFlags(speedValue.getPaintFlags()|Paint.UNDERLINE_TEXT_FLAG);speedValue.setFocusable(true);speedValue.setOnClickListener(v -> showSpeedSettings());
         LinearLayout speedRow=new LinearLayout(this);speedRow.setGravity(Gravity.CENTER_VERTICAL);
         speedRow.addView(slower,new LinearLayout.LayoutParams(dp(64),dp(48)));
         speedRow.addView(speedValue,new LinearLayout.LayoutParams(0,-2,1));
@@ -223,8 +213,9 @@ public class MainActivity extends AppCompatActivity {
     void update() {
         if (word == null || settings || libraryOpen) return;
         speedValue.setText(speed+tr(" words / min"," слов / мин"));
+        speedValue.setContentDescription(speedValue.getText()+tr(". Tap to change reading speed",". Нажмите для изменения скорости"));
         faster.setEnabled(speed<500);slower.setEnabled(speed>30);
-        word.setText(busy ? tr("Loading…", "Загрузка…") : book == null ? "SpeedReader" : book.words.get(position));
+        ((FittingWordView)word).showWord(busy ? tr("Loading…", "Загрузка…") : book == null ? "SpeedReader" : book.words.get(position),fontSize);
         word.setContentDescription(tr("Current word. Tap to pause or resume. ", "Текущее слово. Нажмите для паузы или продолжения. ") + word.getText());
         state.setText(busy ? tr("Preparing your book", "Подготовка книги") : playing ? tr("Reading · tap to pause", "Чтение · нажмите для паузы") : tr("Paused · tap to read", "Пауза · нажмите для чтения"));
         play.setText(playing ? tr("Pause", "Пауза") : tr("Read", "Читать")); play.setEnabled(book != null && !busy);
@@ -396,7 +387,18 @@ public class MainActivity extends AppCompatActivity {
             if (androidx.core.graphics.ColorUtils.calculateContrast(newFg,newBg)<4.5) {fg.setError(tr("Choose more contrasting colors", "Выберите более контрастные цвета")); return;}
             foreground=newFg; background=newBg; theme=-1; saveSettings(); render();
         }));
+        section(content,tr("Reading speed", "Скорость чтения"));
+        TextView speedLabel=text(speed+tr(" words / min"," слов / мин"),16);speedLabel.setGravity(Gravity.CENTER);content.addView(speedLabel);
+        LinearLayout speedRail=vertical();speedRail.setGravity(Gravity.CENTER_HORIZONTAL);content.addView(speedRail);
+        speedRail.addView(text("500",14));speedControl=new VerticalSpeedBar(this);speedControl.setProgress(speed);
+        speedControl.setContentDescription(tr("Reading speed, words per minute. Up to increase.","Скорость чтения, слов в минуту. Вверх — быстрее."));
+        speedRail.addView(speedControl,new LinearLayout.LayoutParams(dp(64),dp(320)));speedRail.addView(text("30",14));
+        speedControl.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+            public void onProgressChanged(SeekBar bar,int value,boolean user){changeSpeed(value);speedLabel.setText(speed+tr(" words / min"," слов / мин"));}
+            public void onStartTrackingTouch(SeekBar bar){}public void onStopTrackingTouch(SeekBar bar){}
+        });
     }
+    void showSpeedSettings(){pause();settings=true;render();content.post(() -> {if(settings&&speedControl!=null)((ScrollView)content.getParent()).scrollTo(0,((View)speedControl.getParent()).getTop()-dp(64));});}
     void choice(LinearLayout parent,String[] labels,int current,NumberAction action) {
         RadioGroup group=new RadioGroup(this);
         for(int i=0;i<labels.length;i++){RadioButton b=new RadioButton(this); b.setId(View.generateViewId()); b.setText(labels[i]);b.setTypeface(uiFace);b.setTextSize(16);b.setTextColor(INK); b.setMinHeight(dp(48)); group.addView(b); if(i==current)group.check(b.getId());}

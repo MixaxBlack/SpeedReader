@@ -73,9 +73,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p release
-          cp app/build/outputs/apk/release/app-release.apk release/SpeedReader-1.2.2.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs release/SpeedReader-1.2.2.apk | tee release/signature.txt
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging release/SpeedReader-1.2.2.apk > release/apk-info.txt
-          cd release && sha256sum SpeedReader-1.2.2.apk > SHA256SUMS && cd ..
-          gh release view v1.2.2 || gh release create v1.2.2 --title 'SpeedReader 1.2.2' --notes-file docs/release-notes.md --target "$GITHUB_SHA"
-          gh release upload v1.2.2 release/* --clobber
+          cp app/build/outputs/apk/release/app-release.apk release/SpeedReader-1.2.3.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs release/SpeedReader-1.2.3.apk | tee release/signature.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging release/SpeedReader-1.2.3.apk > release/apk-info.txt
+          cd release && sha256sum SpeedReader-1.2.3.apk > SHA256SUMS && cd ..
+          gh release view v1.2.3 || gh release create v1.2.3 --title 'SpeedReader 1.2.3' --notes-file docs/release-notes.md --target "$GITHUB_SHA"
+          gh release upload v1.2.3 release/* --clobber

@@ -67,8 +67,9 @@ public class ReaderTest {
             Thread.sleep(1500);
             scenario.onActivity(a -> {
                 assertEquals(500,a.speed);
+                assertNull("Reader leaves the full word width free",a.speedControl);a.showSpeedSettings();
                 assertEquals(30,a.speedControl.getMin());assertEquals(500,a.speedControl.getMax());assertEquals(1,a.speedControl.getKeyProgressIncrement());
-                a.speed=30;a.position=0;a.saveSettings();a.toggle();
+                a.settings=false;a.render();a.speed=30;a.position=0;a.saveSettings();a.toggle();
             });
             Thread.sleep(700);
             scenario.onActivity(a -> {a.pause();assertEquals(0,a.position);});
@@ -83,19 +84,42 @@ public class ReaderTest {
     @Test public void verticalSpeedTouchKeyboardAndAccessibility() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             Thread.sleep(1500);
+            scenario.onActivity(a -> {assertNull(a.speedControl);a.speedValue.performClick();});
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync();Thread.sleep(300);
             scenario.onActivity(a -> {
                 VerticalSpeedBar bar=a.speedControl;
                 assertTrue("Vertical track must be taller than its touch width",bar.getHeight()>bar.getWidth()*2);
-                touch(bar,android.view.MotionEvent.ACTION_DOWN,bar.getHeight());assertEquals(30,a.speed);assertFalse(a.slower.isEnabled());
-                touch(bar,android.view.MotionEvent.ACTION_MOVE,0);assertEquals(500,a.speed);assertFalse(a.faster.isEnabled());
+                touch(bar,android.view.MotionEvent.ACTION_DOWN,bar.getHeight());assertEquals(30,a.speed);
+                touch(bar,android.view.MotionEvent.ACTION_MOVE,0);assertEquals(500,a.speed);
                 touch(bar,android.view.MotionEvent.ACTION_UP,0);
                 android.os.Bundle arguments=new android.os.Bundle();arguments.putFloat(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE,137);
                 assertTrue(bar.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.getId(),arguments));assertEquals(137,a.speed);
                 bar.onKeyDown(android.view.KeyEvent.KEYCODE_DPAD_UP,new android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN,android.view.KeyEvent.KEYCODE_DPAD_UP));assertEquals(138,a.speed);
-                a.faster.performClick();assertEquals(139,a.speed);a.slower.performClick();assertEquals(138,a.speed);
+                a.settings=false;a.render();a.faster.performClick();assertEquals(139,a.speed);a.slower.performClick();assertEquals(138,a.speed);
                 a.saveSettings();
             });
-            scenario.recreate();Thread.sleep(1000);scenario.onActivity(a -> {assertEquals(138,a.speed);assertEquals(138,a.speedControl.getProgress());a.changeSpeed(300);});
+            scenario.recreate();Thread.sleep(1000);scenario.onActivity(a -> {assertEquals(138,a.speed);assertNull(a.speedControl);a.showSpeedSettings();assertEquals(138,a.speedControl.getProgress());a.changeSpeed(300);});
+        }
+    }
+    @Test public void longWordFitsAndNextWordRestoresPreferredSize() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            Thread.sleep(1500);
+            final Book[] original=new Book[1];final int[] old=new int[3];
+            scenario.onActivity(a -> {a.pause();original[0]=a.book;old[0]=a.fontSize;old[1]=a.font;old[2]=a.position;});
+            try{
+                for(int face=0;face<4;face++){
+                    final int selected=face;
+                    scenario.onActivity(a -> {a.fontSize=72;a.font=selected;a.book=new Book("Word fitting",Arrays.asList(String.join("",Collections.nCopies(12,"длинноеслово")),"book"));a.position=0;a.render();});
+                    InstrumentationRegistry.getInstrumentation().waitForIdleSync();Thread.sleep(150);
+                    scenario.onActivity(a -> {
+                        float preferred=android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,72,a.getResources().getDisplayMetrics());
+                        assertTrue("Long word shrinks",a.word.getTextSize()<preferred);
+                        assertTrue("Complete word fits",a.word.getPaint().measureText(a.word.getText().toString())<=a.word.getWidth()-a.word.getCompoundPaddingLeft()-a.word.getCompoundPaddingRight());
+                        assertEquals(72,a.fontSize);a.move(1);
+                        assertEquals("Next short word restores selected size",preferred,a.word.getTextSize(),0.1f);assertEquals(72,a.fontSize);
+                    });
+                }
+            }finally{scenario.onActivity(a -> {a.book=original[0];a.fontSize=old[0];a.font=old[1];a.position=old[2];a.saveSettings();a.savePosition();a.render();});}
         }
     }
     @Test public void largeSystemFontKeepsTransportLabelsSeparate() throws Exception {
