@@ -36,10 +36,37 @@ public class PhoneScanTest {
         ReaderTest device=new ReaderTest();String language=context().getSharedPreferences("reader",Context.MODE_PRIVATE).getString("language","system");
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             waitReady(scenario);scenario.onActivity(a -> {a.language="en";a.library();});waitReady(scenario);
-            scenario.onActivity(a -> {assertFalse(a.hasPhoneAccess());a.scanPhone();});Thread.sleep(800);device.screenshot("phone-access.png");
-            device.shell("input keyevent 4");Thread.sleep(800);
-            scenario.onActivity(a -> {assertFalse(a.hasPhoneAccess());assertFalse(a.scanning);assertTrue(a.libraryMessage.contains("not granted"));});
+            scenario.onActivity(a -> {assertFalse(a.hasPhoneAccess());a.scanPhone();});settleSystemSettings();device.screenshot("phone-access.png");
+            boolean returned=false;
+            for(int back=0;back<3&&!returned;back++){
+                device.shell("input keyevent 4");
+                for(int i=0;i<20;i++){final boolean[] done={false};scenario.onActivity(a -> done[0]=!a.pendingPhoneAccess);if(done[0]){returned=true;break;}Thread.sleep(100);}
+            }
+            assertTrue("Android Settings must return the permission result",returned);
+            scenario.onActivity(a -> {assertFalse(a.hasPhoneAccess());assertFalse(a.scanning);assertTrue("Denial message: "+a.libraryMessage,a.libraryMessage.contains("not granted"));});
         }finally{context().getSharedPreferences("reader",Context.MODE_PRIVATE).edit().putString("language",language).apply();}
+    }
+    void settleSystemSettings() throws Exception {
+        android.app.UiAutomation ui=InstrumentationRegistry.getInstrumentation().getUiAutomation();
+        for(int attempt=0;attempt<4;attempt++){
+            try{ui.waitForIdle(400,4000);}catch(java.util.concurrent.TimeoutException busy){}
+            android.view.accessibility.AccessibilityNodeInfo root=ui.getRootInActiveWindow();
+            if(root!=null){
+                // A cold emulator's launcher can time out while opening Settings.
+                // Recover only the external Quickstep dialog, never an app ANR.
+                if(!root.findAccessibilityNodeInfosByText("Quickstep isn't responding").isEmpty()){
+                    for(android.view.accessibility.AccessibilityNodeInfo node:root.findAccessibilityNodeInfosByText("Wait")){
+                        android.view.accessibility.AccessibilityNodeInfo action=node;
+                        for(int depth=0;depth<4&&action!=null&&!action.isClickable();depth++)action=action.getParent();
+                        if(action!=null)action.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+                    }
+                    android.util.Log.w("SpeedReaderTest","Waited for external emulator launcher ANR");Thread.sleep(800);
+                }else if("com.android.settings".contentEquals(root.getPackageName())){root.recycle();return;}
+                root.recycle();
+            }
+            Thread.sleep(300);
+        }
+        fail("Android Settings did not become ready");
     }
     void removeFixture(File file){File[] children=file.listFiles();if(children!=null)for(File child:children)removeFixture(child);file.delete();}
 }
