@@ -211,7 +211,7 @@ public class MainActivity extends AppCompatActivity {
             if (!f.matches("#[0-9a-fA-F]{6}")) {fg.setError(tr("Use #RRGGBB", "Введите #RRGGBB")); return;}
             if (!b.matches("#[0-9a-fA-F]{6}")) {bg.setError(tr("Use #RRGGBB", "Введите #RRGGBB")); return;}
             int newFg=Color.parseColor(f), newBg=Color.parseColor(b);
-            if (androidx.core.graphics.ColorUtils.calculateContrast(newFg,newBg)<3) {fg.setError(tr("Choose more contrasting colors", "Выберите более контрастные цвета")); return;}
+            if (androidx.core.graphics.ColorUtils.calculateContrast(newFg,newBg)<4.5) {fg.setError(tr("Choose more contrasting colors", "Выберите более контрастные цвета")); return;}
             foreground=newFg; background=newBg; theme=-1; saveSettings(); render();
         }));
     }

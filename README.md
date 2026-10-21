@@ -2,7 +2,7 @@
 
 Native offline Android FB2 speed reader. English and Russian interface.
 
-[Download APK](https://github.com/MixaxBlack/SpeedReader/releases/latest/download/SpeedReader-1.0.0.apk) · [Build and test](https://github.com/MixaxBlack/SpeedReader/actions/workflows/android.yml)
+[Download APK](https://github.com/MixaxBlack/SpeedReader/releases/latest/download/SpeedReader-1.0.1.apk) · [Build and test](https://github.com/MixaxBlack/SpeedReader/actions/workflows/android.yml)
 
 Open an `.fb2` book with the system document picker. Tap Read or the word to start/pause; adjust speed (60–1200 words/min), drag the position slider or step ten words. Appearance offers 18–72 sp, four fonts, ten themes, custom colors and English / Русский / system language. Large words shrink to fit the stage. Books are copied to private app storage; each book has its own saved word position. Reading pauses when the app leaves the foreground. Reading resumes paused after restart. No network access or broad storage permission.
 

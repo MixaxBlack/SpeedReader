@@ -32,3 +32,8 @@ sleep 2
 adb exec-out screencap -p > verification/landscape.png
 adb shell pidof com.mixax.speedreader
 adb shell settings put system user_rotation 0
+adb shell cmd uimode night yes
+sleep 2
+adb exec-out screencap -p > verification/system-dark-mode.png
+adb shell pidof com.mixax.speedreader
+adb shell cmd uimode night no
