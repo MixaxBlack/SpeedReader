@@ -12,3 +12,5 @@ Signed release APK. CI builds and lints, runs parser and reader instrumentation 
 Download SpeedReader-1.0.0.apk below and allow installation from your browser when Android asks.
 
 Vertical speed slider beside the word; +1/−1 buttons for exact speed selection.
+
+New library scanner: Library → Find FB2. Choose one or more book folders through Android, scan subfolders, and repeat scans without duplicates. Read title, author, series, genre and language from FB2 files. Search the library, see word counts/progress, stop scanning and keep already imported books. Malformed/inaccessible files are reported and skipped. Book copies remain available offline. Original files are read only; no all-files permission is requested.

@@ -3,7 +3,7 @@ set -euo pipefail
 mkdir -p verification
 pull_screenshots() {
   mkdir -p verification/screenshots
-  for name in phone-en.png phone-ru-night.png settings-ru.png; do
+  for name in phone-en.png phone-ru-night.png settings-ru.png library-en.png library-ru.png library-landscape.png; do
     adb pull "/data/local/tmp/speedreader-$name" "verification/screenshots/$name" || true
   done
 }

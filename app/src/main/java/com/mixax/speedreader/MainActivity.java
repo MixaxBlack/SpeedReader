@@ -18,9 +18,16 @@ import org.json.JSONObject;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import android.net.Uri;
+import android.provider.DocumentsContract;
+import android.provider.OpenableColumns;
+import android.database.Cursor;
+import android.text.Editable;
+import android.text.TextWatcher;
 
 public class MainActivity extends AppCompatActivity {
-    static final int OPEN = 41;
+    static final int OPEN = 41, SCAN_FOLDER=42;
     final Handler handler = new Handler(Looper.getMainLooper());
     final ExecutorService io = Executors.newSingleThreadExecutor();
     android.content.SharedPreferences prefs;
@@ -33,6 +40,14 @@ public class MainActivity extends AppCompatActivity {
     MaterialButton play, faster, slower;
     VerticalSpeedBar speedControl;
     Slider seek;
+    boolean libraryOpen,scanning;
+    AtomicBoolean scanCancelled=new AtomicBoolean();
+    List<BookStore.Entry> libraryEntries=new ArrayList<>();
+    String libraryQuery="",libraryMessage="";
+    TextView libraryStatus,libraryEmpty;
+    EditText librarySearch;
+    ListView libraryList;
+    LibraryAdapter libraryAdapter;
     final String[] faces = {"serif", "sans-serif", "monospace", "sans-serif-condensed"};
     final Runnable tick = new Runnable() {
         public void run() {
@@ -49,24 +64,30 @@ public class MainActivity extends AppCompatActivity {
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
         prefs = getSharedPreferences("reader", MODE_PRIVATE);
+        libraryOpen=saved!=null&&saved.getBoolean("libraryOpen",false);
+        libraryQuery=saved==null?"":saved.getString("libraryQuery","");
         language = prefs.getString("language", "system");
+        if(saved!=null&&saved.getBoolean("scanning",false))libraryMessage=tr("Scan stopped. Saved books remain in the library.","Сканирование остановлено. Добавленные книги сохранены.");
         speed = Math.max(30, Math.min(500, prefs.getInt("speed", 300))); fontSize = prefs.getInt("size", 42); font = prefs.getInt("font", 0);
         theme = prefs.getInt("theme", 0); foreground = prefs.getInt("fg", Themes.fg(Math.max(0,theme))); background = prefs.getInt("bg", Themes.bg(Math.max(0,theme)));
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
-                if (settings) { settings = false; render(); }
+                if(libraryOpen){closeLibrary();}
+                else if (settings) { settings = false; render(); }
                 else { pause(); setEnabled(false); getOnBackPressedDispatcher().onBackPressed(); setEnabled(true); }
             }
         });
         render();
         String last = prefs.getString("last", ""); busy = true; render();
+        boolean restoreLibrary=libraryOpen;
         io.execute(() -> {
             Book loaded = null;
             try { if (!last.isEmpty()) loaded = Book.load(new File(getFilesDir(), last + ".json")); } catch (Exception ignored) { }
             try { if (loaded == null) { try (InputStream in = getAssets().open("welcome.fb2")) { loaded = Book.parse(in); } } }
             catch (Exception error) { runOnUiThread(() -> failure(error)); }
             Book result = loaded;
-            runOnUiThread(() -> { if (isDestroyed()) return; busy = false; if (result != null) select(result); else render(); });
+            List<BookStore.Entry> restoredEntries=restoreLibrary?new BookStore(getFilesDir()).entries():new ArrayList<>();
+            runOnUiThread(() -> { if (isDestroyed()) return; busy = false;libraryEntries=restoredEntries; if (result != null) select(result); else render(); });
         });
     }
     TextView text(String label, int size) {
@@ -85,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
     }
     void render() {
         root = vertical(); root.setBackgroundColor(Color.rgb(245,241,231)); root.setPadding(dp(16),0,dp(16),0);
-        boolean compactHeight = !settings && (getResources().getConfiguration().screenHeightDp < 600 || getResources().getConfiguration().fontScale > 1.5f);
+        boolean compactHeight = !settings && !libraryOpen && (getResources().getConfiguration().screenHeightDp < 600 || getResources().getConfiguration().fontScale > 1.5f);
         if (compactHeight) {
             ScrollView viewport = new ScrollView(this); viewport.setFillViewport(true); viewport.addView(root); setContentView(viewport);
         } else setContentView(root);
@@ -95,6 +116,7 @@ public class MainActivity extends AppCompatActivity {
         });
         ViewCompat.requestApplyInsets(root);
         if (settings) { settingsScreen(); return; }
+        if(libraryOpen){libraryScreen();return;}
         row(root, text("SpeedReader", 24), button(tr("Appearance", "Оформление"), () -> { pause(); settings = true; render(); }));
         bookTitle = text(book == null ? tr("Your reading space", "Ваше пространство чтения") : book.title, 18);
         bookTitle.setMaxLines(2); root.addView(bookTitle);
@@ -150,7 +172,7 @@ public class MainActivity extends AppCompatActivity {
         slider.addOnChangeListener((s,n,user) -> { if (user) { int i = Math.round(n); value.setText(label.label(i)); slider.setContentDescription(label.label(i)); change.accept(i); } }); parent.addView(slider);
     }
     void update() {
-        if (word == null || settings) return;
+        if (word == null || settings || libraryOpen) return;
         speedValue.setText(speed+tr(" words / min"," слов / мин"));
         faster.setEnabled(speed<500);slower.setEnabled(speed>30);
         word.setText(busy ? tr("Loading…", "Загрузка…") : book == null ? "SpeedReader" : book.words.get(position));
@@ -174,15 +196,26 @@ public class MainActivity extends AppCompatActivity {
     void savePosition() { if (book != null) prefs.edit().putInt("pos_"+book.id,position).putString("last",book.id).apply(); }
     void saveSettings() { prefs.edit().putInt("speed",speed).putInt("size",fontSize).putInt("font",font).putInt("theme",theme).putInt("fg",foreground).putInt("bg",background).putString("language",language).apply(); }
     void select(Book next) { pause(); book = next; position = Math.min(prefs.getInt("pos_"+book.id,0),book.words.size()-1); savePosition(); render(); }
-    void open() { pause(); Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT); i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*"); startActivityForResult(i,OPEN); }
+    void open() { if(busy)return;pause(); Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT); i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*"); startActivityForResult(i,OPEN); }
     @Override protected void onActivityResult(int request,int result,Intent data) {
         super.onActivityResult(request,result,data);
+        if(request==SCAN_FOLDER){
+            if(result!=RESULT_OK||data==null||data.getData()==null)return;
+            Uri tree=data.getData();
+            try{
+                if(!DocumentsContract.isTreeUri(tree))throw new SecurityException("FOLDER");
+                getContentResolver().takePersistableUriPermission(tree,Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                Set<String> folders=new LinkedHashSet<>(prefs.getStringSet("folders",Collections.emptySet()));folders.add(tree.toString());
+                prefs.edit().putStringSet("folders",folders).apply();startScan(Collections.singletonList(tree));
+            }catch(SecurityException denied){folderError();}
+            return;
+        }
         if (request != OPEN || result != RESULT_OK || data == null || data.getData() == null) return;
         busy = true; update(); android.net.Uri uri = data.getData();
         io.execute(() -> {
             try (InputStream in = getContentResolver().openInputStream(uri)) {
-                if (in == null) throw new IOException("OPEN"); Book next = Book.parse(in); next.save(getFilesDir());
-                runOnUiThread(() -> { if (!isDestroyed()) { busy = false; select(next); } });
+                if (in == null) throw new IOException("OPEN"); Book next = Book.parse(in); new BookStore(getFilesDir()).add(next,sourceName(uri));
+                runOnUiThread(() -> { if (!isDestroyed()) { busy = false;libraryOpen=false; select(next); } });
             } catch (Exception e) { runOnUiThread(() -> { if (!isDestroyed()) { busy = false; update(); failure(e); } }); }
         });
     }
@@ -193,23 +226,91 @@ public class MainActivity extends AppCompatActivity {
             .setPositiveButton(tr("OK", "Понятно"),null).show();
     }
     void library() {
-        pause(); if (busy) return; busy = true; update();
+        pause(); if (busy) return; libraryOpen=true;busy=true;render();
         io.execute(() -> {
-            ArrayList<File> files = new ArrayList<>(); ArrayList<String> titles = new ArrayList<>();
-            File[] all = getFilesDir().listFiles((d,n) -> n.endsWith(".json"));
-            if (all != null) { Arrays.sort(all, (a,b) -> Long.compare(b.lastModified(),a.lastModified()));
-                for (File f : all) { try { Book b = Book.load(f); files.add(f); titles.add(b.title); } catch (Exception ignored) { } }
-            }
-            runOnUiThread(() -> {
-                if (isDestroyed()) return; busy = false; update();
-                new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle(tr("Library", "Библиотека"))
-                    .setItems(titles.isEmpty() ? new String[]{tr("No books yet. Open an FB2 file.", "Пока нет книг. Откройте файл FB2.")} : titles.toArray(new String[0]), (d,index) -> {
-                        if (files.isEmpty()) { open(); return; } busy = true; update();
-                        io.execute(() -> { try { Book b = Book.load(files.get(index)); runOnUiThread(() -> { if (!isDestroyed()) { busy=false; select(b); } }); }
-                            catch (Exception e) { runOnUiThread(() -> { busy=false; update(); failure(e); }); } });
-                    }).setNegativeButton(tr("Close", "Закрыть"),null).show();
-            });
+            List<BookStore.Entry> entries=new BookStore(getFilesDir()).entries();
+            runOnUiThread(() -> {if(!isDestroyed()){busy=false;libraryEntries=entries;render();}});
         });
+    }
+    String sourceName(Uri uri){
+        try(Cursor c=getContentResolver().query(uri,new String[]{OpenableColumns.DISPLAY_NAME},null,null,null)){
+            if(c!=null&&c.moveToFirst())return c.getString(0);
+        }catch(Exception ignored){}
+        return "";
+    }
+    void closeLibrary(){if(scanning)scanCancelled.set(true);libraryOpen=false;render();}
+    void chooseScanFolder(){
+        if(busy)return;pause();
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION|Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+        startActivityForResult(intent,SCAN_FOLDER);
+    }
+    void scanAgain(){
+        if(busy)return;List<Uri> roots=new ArrayList<>();
+        for(String uri:prefs.getStringSet("folders",Collections.emptySet()))roots.add(Uri.parse(uri));
+        if(roots.isEmpty())chooseScanFolder();else startScan(roots);
+    }
+    void folderError(){
+        if(isDestroyed())return;
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setTitle(tr("Folder access needed","Нужен доступ к папке"))
+            .setMessage(tr("Select a book folder and allow read access. If access was removed, select that folder again.","Выберите папку с книгами и разрешите чтение. Если доступ отозван, выберите эту папку заново."))
+            .setPositiveButton(tr("OK","Понятно"),null).show();
+    }
+    void startScan(List<Uri> roots){
+        if(busy)return;pause();libraryOpen=true;scanning=true;busy=true;scanCancelled=new AtomicBoolean();AtomicBoolean cancellation=scanCancelled;render();
+        io.execute(() -> {
+            LibraryScanner.Result result=LibraryScanner.scan(getApplicationContext(),roots,cancellation,snapshot -> runOnUiThread(() -> {
+                if(!isDestroyed()&&libraryOpen&&libraryStatus!=null)libraryStatus.setText(scanSummary(snapshot,false));
+            }));
+            List<BookStore.Entry> entries=new BookStore(getFilesDir()).entries();
+            runOnUiThread(() -> {if(!isDestroyed()){scanning=false;busy=false;libraryEntries=entries;libraryMessage=scanSummary(result,true);render();}});
+        });
+    }
+    String scanSummary(LibraryScanner.Result r,boolean complete){
+        String heading=complete?(r.cancelled?tr("Scan stopped","Сканирование остановлено"):r.limited?tr("Scan limit reached; choose a smaller folder","Лимит сканирования; выберите папку поменьше"):tr("Scan complete","Сканирование завершено")):tr("Scanning…","Поиск книг…");
+        return heading+"\n"+tr("Added: ","Добавлено: ")+r.added+tr(" · Duplicates: "," · Дубли: ")+r.duplicates+tr(" · Skipped: "," · Пропущено: ")+r.failed+
+            "\n"+tr("Checked: ","Проверено: ")+r.examined+" · FB2: "+r.found+(r.unavailable>0?tr(" · Folders unavailable: "," · Недоступно папок: ")+r.unavailable:"")+
+            (!complete&&!r.current.isEmpty()?"\n"+r.current:"");
+    }
+    void libraryScreen(){
+        row(root,text(tr("Library","Библиотека"),24),button(tr("Read","Читать"),this::closeLibrary));
+        MaterialButton scan=button(scanning?tr("Stop scan","Остановить"):tr("Find FB2","Найти FB2"),() -> {if(scanning){scanCancelled.set(true);}else chooseScanFolder();});scan.setEnabled(scanning||!busy);
+        MaterialButton again=button(tr("Scan again","Повторить"),this::scanAgain);again.setEnabled(!busy);row(root,scan,again);
+        boolean compactLibrary=getResources().getConfiguration().screenHeightDp<500;
+        if(!compactLibrary)root.addView(text(tr("Choose a book folder. All subfolders are scanned. Add more folders whenever you need.","Выберите папку с книгами. Поиск включает все подпапки. Можно добавить несколько папок."),14));
+        librarySearch=new EditText(this);librarySearch.setSingleLine(true);librarySearch.setMinHeight(dp(48));librarySearch.setTextSize(16);librarySearch.setTextColor(Color.rgb(36,46,40));
+        librarySearch.setHint(tr("Search title, author or series","Название, автор или серия"));librarySearch.setContentDescription(tr("Search library","Поиск по библиотеке"));librarySearch.setText(libraryQuery);root.addView(librarySearch);
+        libraryStatus=text(scanning?tr("Scanning…","Поиск книг…"):busy?tr("Loading library…","Загрузка библиотеки…"):libraryMessage.isEmpty()?libraryEntries.size()+tr(" books"," книг"):libraryMessage,14);
+        libraryStatus.setMaxLines(compactLibrary?2:5);root.addView(libraryStatus);
+        android.widget.FrameLayout listFrame=new android.widget.FrameLayout(this);root.addView(listFrame,new LinearLayout.LayoutParams(-1,0,1));
+        libraryList=new ListView(this);libraryList.setDividerHeight(dp(1));libraryList.setEnabled(!busy);listFrame.addView(libraryList,new android.widget.FrameLayout.LayoutParams(-1,-1));
+        libraryEmpty=text("",16);libraryEmpty.setGravity(Gravity.CENTER);listFrame.addView(libraryEmpty,new android.widget.FrameLayout.LayoutParams(-1,-1));libraryList.setEmptyView(libraryEmpty);
+        libraryAdapter=new LibraryAdapter();libraryList.setAdapter(libraryAdapter);refreshLibraryList();
+        librarySearch.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){libraryQuery=s.toString();refreshLibraryList();}public void afterTextChanged(Editable e){}});
+        libraryList.setOnItemClickListener((parent,view,index,id) -> {
+            if(busy)return;BookStore.Entry entry=libraryAdapter.filtered.get(index);busy=true;libraryStatus.setText(tr("Opening…","Открытие книги…"));
+            io.execute(() -> {try{Book selected=Book.load(new File(getFilesDir(),entry.id+".json"));runOnUiThread(() -> {if(!isDestroyed()){busy=false;libraryOpen=false;select(selected);}});}
+                catch(Exception error){runOnUiThread(() -> {if(!isDestroyed()){busy=false;render();failure(error);}});}});
+        });
+    }
+    void refreshLibraryList(){
+        libraryAdapter.filtered.clear();for(BookStore.Entry entry:libraryEntries)if(entry.matches(libraryQuery))libraryAdapter.filtered.add(entry);
+        libraryAdapter.notifyDataSetChanged();libraryEmpty.setText(busy?tr("Preparing your library…","Подготовка библиотеки…"):libraryEntries.isEmpty()?tr("No books yet. Tap Find FB2 to scan a folder.","Пока нет книг. Нажмите «Найти FB2» и выберите папку."):tr("No matching books","Книги не найдены"));
+    }
+    final class LibraryAdapter extends BaseAdapter {
+        final List<BookStore.Entry> filtered=new ArrayList<>();
+        public int getCount(){return filtered.size();}public Object getItem(int position){return filtered.get(position);}public long getItemId(int position){return position;}
+        public View getView(int index,View recycled,android.view.ViewGroup parent){
+            LinearLayout item;
+            if(recycled instanceof LinearLayout)item=(LinearLayout)recycled;
+            else{item=vertical();item.setPadding(dp(4),dp(12),dp(4),dp(12));for(int size:new int[]{18,14,13}){TextView label=text("",size);label.setPadding(0,dp(2),0,dp(2));label.setMaxLines(2);label.setEllipsize(android.text.TextUtils.TruncateAt.END);item.addView(label);}}
+            BookStore.Entry entry=filtered.get(index);((TextView)item.getChildAt(0)).setText(entry.displayTitle());
+            ((TextView)item.getChildAt(1)).setText(entry.author.isEmpty()?tr("Author not specified","Автор не указан"):entry.author);
+            int at=Math.max(0,Math.min(entry.wordCount-1,prefs.getInt("pos_"+entry.id,0)));
+            String details=(entry.series.isEmpty()?"":entry.series+" · ")+(entry.language.isEmpty()?"":entry.language+" · ")+entry.wordCount+tr(" words"," слов")+(at>0?" · "+Math.round(100f*(at+1)/entry.wordCount)+"%":"");
+            if(!entry.genre.isEmpty())details+="\n"+entry.genre;
+            ((TextView)item.getChildAt(2)).setText(details);return item;
+        }
     }
     void settingsScreen() {
         row(root, text(tr("Appearance", "Оформление"),24), button(tr("Done", "Готово"), () -> { settings=false; render(); }));
@@ -249,5 +350,6 @@ public class MainActivity extends AppCompatActivity {
         group.setOnCheckedChangeListener((g,id) -> action.accept(g.indexOfChild(g.findViewById(id)))); parent.addView(group);
     }
     @Override protected void onPause(){pause(); saveSettings(); super.onPause();}
-    @Override protected void onDestroy(){handler.removeCallbacksAndMessages(null); io.shutdownNow(); super.onDestroy();}
+    @Override protected void onSaveInstanceState(Bundle out){out.putBoolean("libraryOpen",libraryOpen);out.putBoolean("scanning",scanning);out.putString("libraryQuery",libraryQuery);super.onSaveInstanceState(out);}
+    @Override protected void onDestroy(){scanCancelled.set(true);handler.removeCallbacksAndMessages(null); io.shutdownNow(); super.onDestroy();}
 }

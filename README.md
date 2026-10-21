@@ -2,7 +2,7 @@
 
 Native offline Android FB2 speed reader. English and Russian interface.
 
-[Download APK](https://github.com/MixaxBlack/SpeedReader/releases/latest/download/SpeedReader-1.0.4.apk) · [Build and test](https://github.com/MixaxBlack/SpeedReader/actions/workflows/android.yml)
+[Download APK](https://github.com/MixaxBlack/SpeedReader/releases/latest/download/SpeedReader-1.1.0.apk) · [Build and test](https://github.com/MixaxBlack/SpeedReader/actions/workflows/android.yml)
 
 Open an `.fb2` book with the system document picker. Tap Read or the word to start/pause; adjust speed (30–500 words/min), drag the position slider or step ten words. Appearance offers 18–72 sp, four fonts, ten themes, custom colors and English / Русский / system language. Large words shrink to fit the stage. Books are copied to private app storage; each book has its own saved word position. Reading pauses when the app leaves the foreground. Reading resumes paused after restart. No network access or broad storage permission.
 
@@ -22,3 +22,11 @@ For a release set SPEEDREADER_KEYSTORE to a private keystore containing the `spe
 CI gates release publication on lint, instrumentation tests (encoding, XML boundaries, ZIP, local cache, playback, seeking, persistence and languages), installation/launch of the actual signed APK and signature verification. Screenshots and test reports are attached to the run as `android-verification`. A checksum accompanies the release.
 
 Speed uses a tall vertical slider beside the word (up = faster), plus +1/−1 buttons for precise 30–500 words/min selection. Supports touch, keyboard and accessibility progress actions.
+
+## Scan books into the library
+
+Open Library → Find FB2, choose a folder (for example Books or Documents) and allow read access. SpeedReader scans that folder and all its subfolders for `.fb2` and `.fb2.zip`, imports valid books, skips damaged files and merges content duplicates. Add multiple folders, then use Scan again to revisit all remembered folders. Android restricts selecting storage roots, the Download root and app-private directories; select a permitted book folder inside shared storage. The app does not request all-files access.
+
+The library reads embedded title, author names, series/number, genres and language from `description/title-info`, plus word count and saved progress. Search matches title, author, series, genre or language. Missing author data is labeled as missing; a missing title falls back to the source filename in the library. Metadata sidecars keep browsing lightweight. Existing cached books are migrated automatically without changing their content IDs or positions.
+
+Scans run off the UI thread and report added/duplicate/skipped/unavailable counts. Stop scan keeps already imported books. Leaving the library, rotating or closing the app stops an active scan; use Scan again to continue without duplicates. Each scan is bounded to 100,000 documents / 10,000 FB2 candidates; choose smaller folders when that limit is reached. Imported copies remain readable if source access is later revoked. Uninstalling clears this private library and folder permissions. Originals are never modified.
