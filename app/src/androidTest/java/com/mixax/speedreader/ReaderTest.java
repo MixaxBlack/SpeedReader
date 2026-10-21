@@ -46,7 +46,7 @@ public class ReaderTest {
     @Test public void playbackSeekPersistenceAndBilingualSettings() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             Thread.sleep(1500);
-            scenario.onActivity(a -> {a.language="en";a.speed=600;a.render();assertEquals("Appearance",a.tr("Appearance","Оформление"));a.position=0;a.toggle();assertTrue(a.playing);});
+            scenario.onActivity(a -> {a.language="en";a.speed=500;a.render();assertEquals("Appearance",a.tr("Appearance","Оформление"));a.position=0;a.toggle();assertTrue(a.playing);});
             Thread.sleep(450);
             scenario.onActivity(a -> {a.pause();assertTrue(a.position>=2);a.move(10);assertTrue(a.position>=12);a.move(-10);a.savePosition();a.prefs.edit().putInt("testPosition",a.position).apply();a.language="ru";a.fontSize=48;a.font=2;a.theme=-1;a.background=0xFF101010;a.foreground=0xFFF0F0F0;a.saveSettings();a.settings=true;a.render();});
             scenario.recreate();Thread.sleep(1000);
@@ -55,6 +55,27 @@ public class ReaderTest {
             scenario.onActivity(a -> {a.language="ru";a.theme=1;a.background=Themes.bg(1);a.foreground=Themes.fg(1);a.render();});
             screenshot("phone-ru-night.png");
             scenario.onActivity(a -> {a.settings=true;a.render();});screenshot("settings-ru.png");
+        }
+    }
+    @Test public void speedRangeUpgradeAndSlowPlayback() throws Exception {
+        Context c=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        assertTrue(c.getSharedPreferences("reader",Context.MODE_PRIVATE).edit().putInt("speed",1200).commit());
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
+            Thread.sleep(1500);
+            scenario.onActivity(a -> {
+                assertEquals(500,a.speed);
+                com.google.android.material.slider.Slider slider=(com.google.android.material.slider.Slider)a.root.getChildAt(a.root.getChildCount()-1);
+                assertEquals(30f,slider.getValueFrom(),0f);assertEquals(500f,slider.getValueTo(),0f);assertEquals(1f,slider.getStepSize(),0f);
+                a.speed=30;a.position=0;a.saveSettings();a.toggle();
+            });
+            Thread.sleep(700);
+            scenario.onActivity(a -> {a.pause();assertEquals(0,a.position);});
+            scenario.recreate();Thread.sleep(1000);
+            scenario.onActivity(a -> {assertEquals(30,a.speed);a.speed=300;a.saveSettings();});
+        }
+        assertTrue(c.getSharedPreferences("reader",Context.MODE_PRIVATE).edit().putInt("speed",1).commit());
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(a -> {assertEquals(30,a.speed);a.speed=300;a.saveSettings();});
         }
     }
     void screenshot(String name) throws Exception {

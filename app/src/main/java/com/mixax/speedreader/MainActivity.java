@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(saved);
         prefs = getSharedPreferences("reader", MODE_PRIVATE);
         language = prefs.getString("language", "system");
-        speed = prefs.getInt("speed", 300); fontSize = prefs.getInt("size", 42); font = prefs.getInt("font", 0);
+        speed = Math.max(30, Math.min(500, prefs.getInt("speed", 300))); fontSize = prefs.getInt("size", 42); font = prefs.getInt("font", 0);
         theme = prefs.getInt("theme", 0); foreground = prefs.getInt("fg", Themes.fg(Math.max(0,theme))); background = prefs.getInt("bg", Themes.bg(Math.max(0,theme)));
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
@@ -112,7 +112,7 @@ public class MainActivity extends AppCompatActivity {
         play = button("", this::toggle);
         row(root, button(tr("Back 10", "Назад 10"), () -> move(-10)), play, button(tr("Forward 10", "Вперёд 10"), () -> move(10)));
         root.addView(text(tr("Reading speed", "Скорость чтения"), 16));
-        slider(root, 60, 1200, 10, speed, v -> { speed = v; saveSettings(); if (playing) { handler.removeCallbacks(tick); handler.postDelayed(tick,60000L / speed); } update(); }, v -> v + tr(" words / min", " слов / мин"));
+        slider(root, 30, 500, 1, speed, v -> { speed = v; saveSettings(); if (playing) { handler.removeCallbacks(tick); handler.postDelayed(tick,60000L / speed); } update(); }, v -> v + tr(" words / min", " слов / мин"));
         update();
     }
     interface NumberAction { void accept(int n); }
