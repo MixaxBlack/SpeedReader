@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 mkdir -p verification
-trap 'if [ ! -d verification/screenshots ]; then adb pull /sdcard/Android/data/com.mixax.speedreader/files/screenshots verification/ || true; fi' EXIT
+pull_screenshots() {
+  mkdir -p verification/screenshots
+  for name in phone-en.png phone-ru-night.png settings-ru.png; do
+    adb pull "/data/local/tmp/speedreader-$name" "verification/screenshots/$name" || true
+  done
+}
+trap pull_screenshots EXIT
 gradle --no-daemon :app:connectedDebugAndroidTest
-adb pull /sdcard/Android/data/com.mixax.speedreader/files/screenshots verification/
+pull_screenshots
 # Install the actual release APK after removing the differently signed test build.
-adb uninstall com.mixax.speedreader
+if adb shell pm list packages com.mixax.speedreader | grep -q 'package:com.mixax.speedreader'; then
+  adb uninstall com.mixax.speedreader
+fi
 adb install app/build/outputs/apk/release/app-release.apk
 adb shell am start -W -n com.mixax.speedreader/.MainActivity | tee verification/release-start.txt
 sleep 3

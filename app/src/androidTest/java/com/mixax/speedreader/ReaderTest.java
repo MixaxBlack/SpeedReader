@@ -62,5 +62,10 @@ public class ReaderTest {
         Bitmap b=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();assertNotNull(b);
         File dir=new File(InstrumentationRegistry.getInstrumentation().getTargetContext().getExternalFilesDir(null),"screenshots");assertTrue(dir.isDirectory()||dir.mkdirs());
         try(FileOutputStream out=new FileOutputStream(new File(dir,name))){assertTrue(b.compress(Bitmap.CompressFormat.PNG,100,out));}b.recycle();
+        // UTP uninstalls the target after tests. Preserve review captures in shell-owned storage.
+        try(android.os.ParcelFileDescriptor descriptor=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand("screencap -p /data/local/tmp/speedreader-"+name);
+            InputStream commandOutput=new android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
+            byte[] buffer=new byte[1024];while(commandOutput.read(buffer)!=-1){ /* Wait for screencap completion. */ }
+        }
     }
 }
