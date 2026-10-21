@@ -107,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
         readingArea.addView(stage,new LinearLayout.LayoutParams(0,-1,1));
         LinearLayout rail=vertical();rail.setGravity(Gravity.CENTER_HORIZONTAL);
         LinearLayout.LayoutParams railParams=new LinearLayout.LayoutParams(dp(64),-1);railParams.setMargins(dp(12),0,0,0);readingArea.addView(rail,railParams);
-        faster=button("+1",() -> changeSpeed(speed+1));faster.setContentDescription(tr("Faster by 1 word per minute", "Быстрее на 1 слово в минуту"));rail.addView(faster,new LinearLayout.LayoutParams(-1,dp(48)));
+        faster=button("+1",() -> changeSpeed(speed+1));faster.setSingleLine(true);faster.setPadding(0,0,0,0);faster.setContentDescription(tr("Faster by 1 word per minute", "Быстрее на 1 слово в минуту"));
         TextView maximum=text("500",12);maximum.setGravity(Gravity.CENTER);rail.addView(maximum);
         speedControl=new VerticalSpeedBar(this);speedControl.setProgress(speed);
         speedControl.setContentDescription(tr("Reading speed, words per minute. Up to increase.","Скорость чтения, слов в минуту. Вверх — быстрее."));
@@ -117,13 +117,17 @@ public class MainActivity extends AppCompatActivity {
             public void onStopTrackingTouch(SeekBar bar){}
         });rail.addView(speedControl,new LinearLayout.LayoutParams(-1,0,1));
         TextView minimum=text("30",12);minimum.setGravity(Gravity.CENTER);rail.addView(minimum);
-        slower=button("−1",() -> changeSpeed(speed-1));slower.setContentDescription(tr("Slower by 1 word per minute", "Медленнее на 1 слово в минуту"));rail.addView(slower,new LinearLayout.LayoutParams(-1,dp(48)));
+        slower=button("−1",() -> changeSpeed(speed-1));slower.setSingleLine(true);slower.setPadding(0,0,0,0);slower.setContentDescription(tr("Slower by 1 word per minute", "Медленнее на 1 слово в минуту"));
         word = text("",fontSize); word.setTextColor(foreground); word.setTypeface(Typeface.create(faces[font],Typeface.NORMAL)); word.setGravity(Gravity.CENTER);
         word.setSingleLine(true); word.setAutoSizeTextTypeUniformWithConfiguration(12,fontSize,1,android.util.TypedValue.COMPLEX_UNIT_SP);
         word.setMinHeight(dp(64)); word.setFocusable(true); word.setOnClickListener(v -> toggle());
         stage.setOnClickListener(v -> toggle()); stage.addView(word,new LinearLayout.LayoutParams(-1,-2));
         state = text("", 14); state.setTextColor(foreground); state.setGravity(Gravity.CENTER); stage.addView(state);
-        speedValue=text("",16);speedValue.setGravity(Gravity.CENTER);root.addView(speedValue);
+        speedValue=text("",16);speedValue.setGravity(Gravity.CENTER);
+        LinearLayout speedRow=new LinearLayout(this);speedRow.setGravity(Gravity.CENTER_VERTICAL);
+        speedRow.addView(slower,new LinearLayout.LayoutParams(dp(64),dp(48)));
+        speedRow.addView(speedValue,new LinearLayout.LayoutParams(0,-2,1));
+        speedRow.addView(faster,new LinearLayout.LayoutParams(dp(64),dp(48)));root.addView(speedRow);
         progress = text("",14); progress.setGravity(Gravity.CENTER); root.addView(progress);
         seek = new Slider(this); seek.setValueFrom(0); seek.setValueTo(1000); seek.setStepSize(1); seek.setContentDescription(tr("Reading position", "Позиция чтения"));
         seek.addOnChangeListener((s,v,user) -> { if (user && book != null) { pause(); position = Math.round(v / 1000f * (book.words.size()-1)); update(); savePosition(); } }); root.addView(seek);
@@ -147,7 +151,7 @@ public class MainActivity extends AppCompatActivity {
     }
     void update() {
         if (word == null || settings) return;
-        speedValue.setText(tr("Reading speed: ","Скорость чтения: ")+speed+tr(" words / min"," слов / мин"));
+        speedValue.setText(speed+tr(" words / min"," слов / мин"));
         faster.setEnabled(speed<500);slower.setEnabled(speed>30);
         word.setText(busy ? tr("Loading…", "Загрузка…") : book == null ? "SpeedReader" : book.words.get(position));
         word.setContentDescription(tr("Current word. Tap to pause or resume. ", "Текущее слово. Нажмите для паузы или продолжения. ") + word.getText());

@@ -3,4 +3,4 @@ Native Android, Operate / Read. Quiet paper-colored reading surface, forest prim
 
 The controls explicitly use the Material Light theme in both system modes; reading themes remain independently selectable. Custom reading colors require at least 4.5:1 contrast, including the smaller reading-status text.
 
-Speed uses a 64dp-wide vertical native SeekBar rail beside the reading stage, with 500 at the top and 30 at the bottom. The rail fills available reading height; compact-height layouts allocate a scrollable 420dp reading area. Native accessibility range and keyboard control are retained, with adjacent +1/−1 buttons for exact selection. Position seeking remains horizontal.
+Speed uses a 64dp-wide vertical native SeekBar rail beside the reading stage, with 500 at the top and 30 at the bottom. The rail fills available reading height; compact-height layouts allocate a scrollable 420dp reading area. Native accessibility range and keyboard control are retained. A row beneath the stage places +1/−1 buttons around the current speed, preserving a long track and single-line step labels. Position seeking remains horizontal.
