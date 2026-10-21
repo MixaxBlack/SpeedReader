@@ -64,8 +64,7 @@ public class ReaderTest {
             Thread.sleep(1500);
             scenario.onActivity(a -> {
                 assertEquals(500,a.speed);
-                com.google.android.material.slider.Slider slider=(com.google.android.material.slider.Slider)a.root.getChildAt(a.root.getChildCount()-1);
-                assertEquals(30f,slider.getValueFrom(),0f);assertEquals(500f,slider.getValueTo(),0f);assertEquals(1f,slider.getStepSize(),0f);
+                assertEquals(30,a.speedControl.getMin());assertEquals(500,a.speedControl.getMax());assertEquals(1,a.speedControl.getKeyProgressIncrement());
                 a.speed=30;a.position=0;a.saveSettings();a.toggle();
             });
             Thread.sleep(700);
@@ -77,6 +76,28 @@ public class ReaderTest {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             scenario.onActivity(a -> {assertEquals(30,a.speed);a.speed=300;a.saveSettings();});
         }
+    }
+    @Test public void verticalSpeedTouchKeyboardAndAccessibility() throws Exception {
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+            Thread.sleep(1500);
+            scenario.onActivity(a -> {
+                VerticalSpeedBar bar=a.speedControl;
+                assertTrue("Vertical track must be taller than its touch width",bar.getHeight()>bar.getWidth()*2);
+                touch(bar,android.view.MotionEvent.ACTION_DOWN,bar.getHeight());assertEquals(30,a.speed);assertFalse(a.slower.isEnabled());
+                touch(bar,android.view.MotionEvent.ACTION_MOVE,0);assertEquals(500,a.speed);assertFalse(a.faster.isEnabled());
+                touch(bar,android.view.MotionEvent.ACTION_UP,0);
+                android.os.Bundle arguments=new android.os.Bundle();arguments.putFloat(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE,137);
+                assertTrue(bar.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.getId(),arguments));assertEquals(137,a.speed);
+                bar.onKeyDown(android.view.KeyEvent.KEYCODE_DPAD_UP,new android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN,android.view.KeyEvent.KEYCODE_DPAD_UP));assertEquals(138,a.speed);
+                a.faster.performClick();assertEquals(139,a.speed);a.slower.performClick();assertEquals(138,a.speed);
+                a.saveSettings();
+            });
+            scenario.recreate();Thread.sleep(1000);scenario.onActivity(a -> {assertEquals(138,a.speed);assertEquals(138,a.speedControl.getProgress());a.changeSpeed(300);});
+        }
+    }
+    void touch(VerticalSpeedBar bar,int action,float y){
+        long now=android.os.SystemClock.uptimeMillis();android.view.MotionEvent event=android.view.MotionEvent.obtain(now,now,action,bar.getWidth()/2f,y,0);
+        try{assertTrue(bar.dispatchTouchEvent(event));}finally{event.recycle();}
     }
     void screenshot(String name) throws Exception {
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();Thread.sleep(250);

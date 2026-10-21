@@ -29,8 +29,9 @@ public class MainActivity extends AppCompatActivity {
     boolean playing, settings, busy;
     String language;
     LinearLayout root, content;
-    TextView word, progress, bookTitle, state;
-    MaterialButton play;
+    TextView word, progress, bookTitle, state, speedValue;
+    MaterialButton play, faster, slower;
+    VerticalSpeedBar speedControl;
     Slider seek;
     final String[] faces = {"serif", "sans-serif", "monospace", "sans-serif-condensed"};
     final Runnable tick = new Runnable() {
@@ -83,7 +84,7 @@ public class MainActivity extends AppCompatActivity {
         parent.addView(l);
     }
     void render() {
-        root = vertical(); root.setBackgroundColor(Color.rgb(245,241,231));
+        root = vertical(); root.setBackgroundColor(Color.rgb(245,241,231)); root.setPadding(dp(16),0,dp(16),0);
         boolean compactHeight = !settings && (getResources().getConfiguration().screenHeightDp < 600 || getResources().getConfiguration().fontScale > 1.5f);
         if (compactHeight) {
             ScrollView viewport = new ScrollView(this); viewport.setFillViewport(true); viewport.addView(root); setContentView(viewport);
@@ -100,19 +101,40 @@ public class MainActivity extends AppCompatActivity {
         row(root, button(tr("Open FB2", "Открыть FB2"), this::open), button(tr("Library", "Библиотека"), this::library));
         LinearLayout stage = vertical(); stage.setGravity(Gravity.CENTER); stage.setPadding(dp(12),0,dp(12),0);
         GradientDrawable surface = new GradientDrawable(); surface.setColor(background); surface.setCornerRadius(dp(20)); stage.setBackground(surface);
-        LinearLayout.LayoutParams stageParams = compactHeight ? new LinearLayout.LayoutParams(-1,dp(200)) : new LinearLayout.LayoutParams(-1,0,1); stageParams.setMargins(0,dp(16),0,dp(12)); root.addView(stage,stageParams);
+        LinearLayout readingArea = new LinearLayout(this);
+        LinearLayout.LayoutParams areaParams = compactHeight ? new LinearLayout.LayoutParams(-1,dp(420)) : new LinearLayout.LayoutParams(-1,0,1);
+        areaParams.setMargins(0,dp(16),0,dp(12)); root.addView(readingArea,areaParams);
+        readingArea.addView(stage,new LinearLayout.LayoutParams(0,-1,1));
+        LinearLayout rail=vertical();rail.setGravity(Gravity.CENTER_HORIZONTAL);
+        LinearLayout.LayoutParams railParams=new LinearLayout.LayoutParams(dp(64),-1);railParams.setMargins(dp(12),0,0,0);readingArea.addView(rail,railParams);
+        faster=button("+1",() -> changeSpeed(speed+1));faster.setContentDescription(tr("Faster by 1 word per minute", "Быстрее на 1 слово в минуту"));rail.addView(faster,new LinearLayout.LayoutParams(-1,dp(48)));
+        TextView maximum=text("500",12);maximum.setGravity(Gravity.CENTER);rail.addView(maximum);
+        speedControl=new VerticalSpeedBar(this);speedControl.setProgress(speed);
+        speedControl.setContentDescription(tr("Reading speed, words per minute. Up to increase.","Скорость чтения, слов в минуту. Вверх — быстрее."));
+        speedControl.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+            public void onProgressChanged(SeekBar bar,int value,boolean user){changeSpeed(value);}
+            public void onStartTrackingTouch(SeekBar bar){}
+            public void onStopTrackingTouch(SeekBar bar){}
+        });rail.addView(speedControl,new LinearLayout.LayoutParams(-1,0,1));
+        TextView minimum=text("30",12);minimum.setGravity(Gravity.CENTER);rail.addView(minimum);
+        slower=button("−1",() -> changeSpeed(speed-1));slower.setContentDescription(tr("Slower by 1 word per minute", "Медленнее на 1 слово в минуту"));rail.addView(slower,new LinearLayout.LayoutParams(-1,dp(48)));
         word = text("",fontSize); word.setTextColor(foreground); word.setTypeface(Typeface.create(faces[font],Typeface.NORMAL)); word.setGravity(Gravity.CENTER);
         word.setSingleLine(true); word.setAutoSizeTextTypeUniformWithConfiguration(12,fontSize,1,android.util.TypedValue.COMPLEX_UNIT_SP);
         word.setMinHeight(dp(64)); word.setFocusable(true); word.setOnClickListener(v -> toggle());
         stage.setOnClickListener(v -> toggle()); stage.addView(word,new LinearLayout.LayoutParams(-1,-2));
         state = text("", 14); state.setTextColor(foreground); state.setGravity(Gravity.CENTER); stage.addView(state);
+        speedValue=text("",16);speedValue.setGravity(Gravity.CENTER);root.addView(speedValue);
         progress = text("",14); progress.setGravity(Gravity.CENTER); root.addView(progress);
         seek = new Slider(this); seek.setValueFrom(0); seek.setValueTo(1000); seek.setStepSize(1); seek.setContentDescription(tr("Reading position", "Позиция чтения"));
         seek.addOnChangeListener((s,v,user) -> { if (user && book != null) { pause(); position = Math.round(v / 1000f * (book.words.size()-1)); update(); savePosition(); } }); root.addView(seek);
         play = button("", this::toggle);
         row(root, button(tr("Back 10", "Назад 10"), () -> move(-10)), play, button(tr("Forward 10", "Вперёд 10"), () -> move(10)));
-        root.addView(text(tr("Reading speed", "Скорость чтения"), 16));
-        slider(root, 30, 500, 1, speed, v -> { speed = v; saveSettings(); if (playing) { handler.removeCallbacks(tick); handler.postDelayed(tick,60000L / speed); } update(); }, v -> v + tr(" words / min", " слов / мин"));
+        update();
+    }
+    void changeSpeed(int requested) {
+        int next=Math.max(30,Math.min(500,requested));
+        if(speed!=next){speed=next;saveSettings();if(playing){handler.removeCallbacks(tick);handler.postDelayed(tick,60000L/speed);}}
+        if(speedControl!=null&&speedControl.getProgress()!=speed)speedControl.setProgress(speed);
         update();
     }
     interface NumberAction { void accept(int n); }
@@ -125,6 +147,8 @@ public class MainActivity extends AppCompatActivity {
     }
     void update() {
         if (word == null || settings) return;
+        speedValue.setText(tr("Reading speed: ","Скорость чтения: ")+speed+tr(" words / min"," слов / мин"));
+        faster.setEnabled(speed<500);slower.setEnabled(speed>30);
         word.setText(busy ? tr("Loading…", "Загрузка…") : book == null ? "SpeedReader" : book.words.get(position));
         word.setContentDescription(tr("Current word. Tap to pause or resume. ", "Текущее слово. Нажмите для паузы или продолжения. ") + word.getText());
         state.setText(busy ? tr("Preparing your book", "Подготовка книги") : playing ? tr("Reading · tap to pause", "Чтение · нажмите для паузы") : tr("Paused · tap to read", "Пауза · нажмите для чтения"));
