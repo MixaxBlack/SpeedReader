@@ -86,6 +86,7 @@ public class ReaderTest {
             Thread.sleep(1500);
             scenario.onActivity(a -> {assertNull(a.speedControl);a.speedValue.performClick();});
             InstrumentationRegistry.getInstrumentation().waitForIdleSync();Thread.sleep(300);
+            screenshot("speed-settings.png");
             scenario.onActivity(a -> {
                 VerticalSpeedBar bar=a.speedControl;
                 assertTrue("Vertical track must be taller than its touch width",bar.getHeight()>bar.getWidth()*2);
@@ -115,9 +116,14 @@ public class ReaderTest {
                         float preferred=android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,72,a.getResources().getDisplayMetrics());
                         assertTrue("Long word shrinks",a.word.getTextSize()<preferred);
                         assertTrue("Complete word fits",a.word.getPaint().measureText(a.word.getText().toString())<=a.word.getWidth()-a.word.getCompoundPaddingLeft()-a.word.getCompoundPaddingRight());
-                        assertEquals(72,a.fontSize);a.move(1);
+                        assertEquals(72,a.fontSize);
+                    });
+                    if(face==0)screenshot("long-word.png");
+                    scenario.onActivity(a -> {
+                        float preferred=android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,72,a.getResources().getDisplayMetrics());a.move(1);
                         assertEquals("Next short word restores selected size",preferred,a.word.getTextSize(),0.1f);assertEquals(72,a.fontSize);
                     });
+                    if(face==0)screenshot("restored-word.png");
                 }
             }finally{scenario.onActivity(a -> {a.book=original[0];a.fontSize=old[0];a.font=old[1];a.position=old[2];a.saveSettings();a.savePosition();a.render();});}
         }
