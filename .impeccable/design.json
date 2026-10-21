@@ -1,0 +1,17 @@
+{
+  "platform": "android",
+  "mode": "operate",
+  "surface": "native-reader",
+  "tokens": {
+    "surface": "#F5F1E7",
+    "foreground": "#242E28",
+    "primary": "#376859",
+    "onPrimary": "#FFFFFF",
+    "readingSizeSp": 42,
+    "touchTargetDp": 48,
+    "pagePaddingDp": 16,
+    "readingCornerDp": 20
+  },
+  "type": {"ui": "sans-serif", "reading": "serif", "titleSp": 24, "bodySp": 16, "labelSp": 14},
+  "themes": ["Paper", "Night", "Sepia", "Ink", "Forest", "Ocean", "Plum", "Sand", "Slate", "High contrast"]
+}

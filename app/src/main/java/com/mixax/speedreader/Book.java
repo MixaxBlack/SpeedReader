@@ -17,7 +17,7 @@ public final class Book {
     static final int MAX_BYTES = 32 * 1024 * 1024;
     public Book(String title, List<String> words) throws Exception {
         if (words.isEmpty()) throw new IOException("EMPTY");
-        this.title = title.isBlank() ? "FB2" : title;
+        this.title = title.trim().isEmpty() ? "FB2" : title;
         this.words = Collections.unmodifiableList(new ArrayList<>(words));
         MessageDigest hash = MessageDigest.getInstance("SHA-256");
         hash.update(this.title.getBytes(StandardCharsets.UTF_8));
