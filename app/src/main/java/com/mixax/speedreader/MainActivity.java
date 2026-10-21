@@ -43,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
     boolean libraryOpen,scanning;
     AtomicBoolean scanCancelled=new AtomicBoolean();
     List<BookStore.Entry> libraryEntries=new ArrayList<>();
+    List<Uri> pendingScanRoots=Collections.emptyList();
     String libraryQuery="",libraryMessage="";
     TextView libraryStatus,libraryEmpty;
     EditText librarySearch;
@@ -87,7 +88,10 @@ public class MainActivity extends AppCompatActivity {
             catch (Exception error) { runOnUiThread(() -> failure(error)); }
             Book result = loaded;
             List<BookStore.Entry> restoredEntries=restoreLibrary?new BookStore(getFilesDir()).entries():new ArrayList<>();
-            runOnUiThread(() -> { if (isDestroyed()) return; busy = false;libraryEntries=restoredEntries; if (result != null) select(result); else render(); });
+            runOnUiThread(() -> {
+                if (isDestroyed()) return; busy = false;libraryEntries=restoredEntries; if (result != null) select(result); else render();
+                if(!pendingScanRoots.isEmpty()){List<Uri> pending=pendingScanRoots;pendingScanRoots=Collections.emptyList();startScan(pending);}
+            });
         });
     }
     TextView text(String label, int size) {
@@ -238,7 +242,7 @@ public class MainActivity extends AppCompatActivity {
         }catch(Exception ignored){}
         return "";
     }
-    void closeLibrary(){if(scanning)scanCancelled.set(true);libraryOpen=false;render();}
+    void closeLibrary(){pendingScanRoots=Collections.emptyList();if(scanning)scanCancelled.set(true);libraryOpen=false;render();}
     void chooseScanFolder(){
         if(busy)return;pause();
         Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
@@ -257,7 +261,7 @@ public class MainActivity extends AppCompatActivity {
             .setPositiveButton(tr("OK","Понятно"),null).show();
     }
     void startScan(List<Uri> roots){
-        if(busy)return;pause();libraryOpen=true;scanning=true;busy=true;scanCancelled=new AtomicBoolean();AtomicBoolean cancellation=scanCancelled;render();
+        if(busy){if(!scanning)pendingScanRoots=new ArrayList<>(roots);return;}pause();libraryOpen=true;scanning=true;busy=true;scanCancelled=new AtomicBoolean();AtomicBoolean cancellation=scanCancelled;render();
         io.execute(() -> {
             LibraryScanner.Result result=LibraryScanner.scan(getApplicationContext(),roots,cancellation,snapshot -> runOnUiThread(() -> {
                 if(!isDestroyed()&&libraryOpen&&libraryStatus!=null)libraryStatus.setText(scanSummary(snapshot,false));

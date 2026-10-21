@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <activity android:name="com.mixax.speedreader.FixtureGrantActivity" android:exported="true" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <provider android:name="com.mixax.speedreader.FixtureDocumentsProvider"
             android:authorities="com.mixax.speedreader.fixture.documents"
             android:exported="true" android:grantUriPermissions="true"

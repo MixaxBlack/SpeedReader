@@ -25,13 +25,23 @@ public class LibraryTest {
         File directory=new File(context().getCacheDir(),"library-"+UUID.randomUUID());assertTrue(directory.mkdirs());
         return new ContextWrapper(context()){@Override public File getFilesDir(){return directory;}};
     }
-    @Before public void accessTestProvider(){
-        InstrumentationRegistry.getInstrumentation().getUiAutomation().adoptShellPermissionIdentity("android.permission.MANAGE_DOCUMENTS");
+    void treeAccess(boolean allow) throws Exception {
+        android.content.Intent intent=new android.content.Intent().setClassName("com.mixax.speedreader.test","com.mixax.speedreader.FixtureGrantActivity");
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION);intent.putExtra("revoke",!allow);context().startActivity(intent);
+        for(int i=0;i<60;i++){
+            boolean granted=context().checkUriPermission(tree("root"),android.os.Process.myPid(),android.os.Process.myUid(),android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)==android.content.pm.PackageManager.PERMISSION_GRANTED;
+            if(granted==allow){InstrumentationRegistry.getInstrumentation().waitForIdleSync();Thread.sleep(150);return;}Thread.sleep(50);
+        }
+        fail("Test tree grant did not reach expected state: "+allow);
+    }
+    @Before public void accessTestProvider() throws Exception {
+        treeAccess(true);
+        context().getContentResolver().takePersistableUriPermission(tree("root"),android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
         try(android.database.Cursor cursor=context().getContentResolver().query(DocumentsContract.buildChildDocumentsUriUsingTree(tree("root"),"root"),null,null,null,null)){
             assertNotNull("Test document provider must be reachable",cursor);assertEquals(6,cursor.getCount());
         }
     }
-    @After public void releaseTestProvider(){InstrumentationRegistry.getInstrumentation().getUiAutomation().dropShellPermissionIdentity();}
+    @After public void releaseTestProvider() throws Exception {treeAccess(false);}
     @Test public void metadataAuthorsAndOldCacheCompatibility() throws Exception {
         String xml=FixtureDocumentsProvider.book("Метаданные","Анна","Петрова","Цикл","UTF-8").replace("</title-info>","<author><nickname>Second Author</nickname></author></title-info>");
         Book book=Book.parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
@@ -52,7 +62,8 @@ public class LibraryTest {
         assertTrue(entries.stream().anyMatch(e->e.title.equals(FixtureDocumentsProvider.SECOND_TITLE)&&e.author.equals("Иван Сидоров")));
         LibraryScanner.Result again=LibraryScanner.scan(c,Collections.singletonList(tree("root")),cancelled,result -> {});
         assertEquals(0,again.added);assertEquals(4,again.duplicates);assertEquals(1,again.failed);assertEquals(2,new BookStore(c.getFilesDir()).entries().size());
-        InstrumentationRegistry.getInstrumentation().getUiAutomation().dropShellPermissionIdentity();
+        treeAccess(false);
+        assertEquals(1,LibraryScanner.scan(c,Collections.singletonList(tree("root")),new AtomicBoolean(),result -> {}).unavailable);
         Book offline=Book.load(new File(c.getFilesDir(),entries.get(0).id+".json"));assertFalse(offline.words.isEmpty());
     }
     @Test public void cancelAndUnavailableFolderDoNotDamageLibrary() throws Exception {
@@ -67,7 +78,7 @@ public class LibraryTest {
         android.content.SharedPreferences preferences=context().getSharedPreferences("reader",Context.MODE_PRIVATE);
         String previousLast=preferences.getString("last",""),previousLanguage=preferences.getString("language","system");
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
-            Thread.sleep(1200);scenario.onActivity(a -> {a.language="en";a.startScan(Collections.singletonList(tree("root")));});
+            scenario.onActivity(a -> {a.language="en";a.startScan(Collections.singletonList(tree("root")));});
             for(int i=0;i<100;i++){final boolean[] done={false};scenario.onActivity(a -> done[0]=!a.busy);if(done[0])break;Thread.sleep(100);}
             scenario.onActivity(a -> {assertFalse(a.busy);assertTrue(a.libraryOpen);assertTrue(a.libraryEntries.size()>=2);assertTrue(a.libraryMessage.contains("Skipped: 1"));});
             ReaderTest screenshots=new ReaderTest();screenshots.screenshot("library-en.png");
@@ -78,7 +89,7 @@ public class LibraryTest {
             scenario.onActivity(a -> {a.librarySearch.setText("Петрова");assertEquals(1,a.libraryAdapter.getCount());});
             scenario.recreate();Thread.sleep(1200);
             scenario.onActivity(a -> {assertTrue(a.libraryOpen);assertEquals("Петрова",a.libraryQuery);assertEquals(1,a.libraryAdapter.getCount());});
-            InstrumentationRegistry.getInstrumentation().getUiAutomation().dropShellPermissionIdentity();
+            treeAccess(false);
             scenario.onActivity(a -> a.libraryList.performItemClick(null,0,0));Thread.sleep(600);
             scenario.onActivity(a -> {assertFalse(a.busy);assertFalse(a.libraryOpen);assertEquals(FixtureDocumentsProvider.FIRST_TITLE,a.book.title);assertEquals("Анна Петрова",a.book.author);a.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);});
         }finally{preferences.edit().putString("last",previousLast).putString("language",previousLanguage).apply();}
