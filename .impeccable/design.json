@@ -3,15 +3,20 @@
   "mode": "operate",
   "surface": "native-reader",
   "tokens": {
-    "surface": "#F5F1E7",
-    "foreground": "#242E28",
-    "primary": "#376859",
+    "surface": "#F7F6F3",
+    "foreground": "#252922",
+    "muted": "#62685D",
+    "rule": "#DCDDD5",
+    "primary": "#426650",
+    "primaryButton": "#252922",
     "onPrimary": "#FFFFFF",
     "readingSizeSp": 42,
     "touchTargetDp": 48,
-    "pagePaddingDp": 16,
-    "readingCornerDp": 20
+    "pagePaddingDp": 20,
+    "readingCornerDp": 8,
+    "buttonCornerDp": 6,
+    "fieldCornerDp": 8
   },
-  "type": {"ui": "sans-serif", "reading": "serif", "titleSp": 24, "bodySp": 16, "labelSp": 14},
+  "type": {"ui": "Manrope", "uiWeight": 450, "buttonWeight": 550, "sectionWeight": 600, "reading": "serif", "heading": "serif", "titleSp": 28, "bookTitleSp": 21, "libraryTitleSp": 22, "bodySp": 16, "labelSp": 14},
   "themes": ["Paper", "Night", "Sepia", "Ink", "Forest", "Ocean", "Plum", "Sand", "Slate", "High contrast"]
 }
