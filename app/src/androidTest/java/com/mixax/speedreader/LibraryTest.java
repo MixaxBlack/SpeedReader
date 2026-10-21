@@ -32,6 +32,8 @@ public class LibraryTest {
         Book book=Book.parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
         assertEquals("Анна Петрова, Second Author",book.author);assertEquals("Цикл · 2",book.series);assertEquals("adventure",book.genre);assertEquals("ru",book.language);
         assertEquals(new Book(book.title,book.words).id,book.id);
+        String rawTitle="Line one\n  Line two";Book multiline=Book.parse(new ByteArrayInputStream(FixtureDocumentsProvider.book(rawTitle,"A","B","Series","UTF-8").getBytes(StandardCharsets.UTF_8)));
+        assertEquals(new Book(rawTitle,multiline.words).id,multiline.id);
         Context c=isolated();BookStore store=new BookStore(c.getFilesDir());store.add(book,"metadata.fb2");
         Book loaded=Book.load(new File(c.getFilesDir(),book.id+".json"));assertEquals(book.author,loaded.author);
         BookStore.Entry entry=store.entries().get(0);assertTrue(entry.matches("ПЕТРОВА"));assertTrue(entry.matches("Цикл"));assertFalse(entry.matches("No matching author"));

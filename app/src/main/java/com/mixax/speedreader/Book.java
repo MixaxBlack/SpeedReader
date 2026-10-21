@@ -93,7 +93,7 @@ public final class Book {
                 if (p.getDepth() == 1 && "FictionBook".equals(tag)) rootClosed = true;
                 if(p.getDepth()==fieldDepth){
                     String value=fieldValue.toString().replaceAll("[\\s\\u00a0]+"," ").trim();
-                    if("book-title".equals(field)&&title.length()==0)title.append(value);
+                    if("book-title".equals(field)&&title.length()==0)title.append(fieldValue.toString().trim());
                     else if("genre".equals(field)&&!value.isEmpty())genres.add(value);
                     else if("lang".equals(field))language=value;
                     else if("nickname".equals(field))nickname=value;
