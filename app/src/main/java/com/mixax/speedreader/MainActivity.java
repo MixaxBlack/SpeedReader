@@ -186,11 +186,11 @@ public class MainActivity extends AppCompatActivity {
         content.addView(text(tr("Interface language", "Язык интерфейса"),20));
         choice(content,new String[]{tr("System", "Системный"),"English","Русский"},Arrays.asList("system","en","ru").indexOf(language), i -> { language = new String[]{"system","en","ru"}[i]; saveSettings(); render(); });
         content.addView(text(tr("Word preview", "Предпросмотр слова"),20));
-        TextView preview = text(tr("Attention", "Внимание"),fontSize); preview.setGravity(Gravity.CENTER); preview.setTextColor(foreground); preview.setBackgroundColor(background); preview.setTypeface(Typeface.create(faces[font],0)); preview.setMinHeight(dp(120)); content.addView(preview);
+        TextView preview = text(tr("Attention", "Внимание"),fontSize); preview.setGravity(Gravity.CENTER); preview.setTextColor(foreground); preview.setBackgroundColor(background); preview.setTypeface(Typeface.create(faces[font],Typeface.NORMAL)); preview.setMinHeight(dp(120)); content.addView(preview);
         content.addView(text(tr("Word size", "Размер слова"),20));
         slider(content,18,72,1,fontSize,n -> { fontSize=n; preview.setTextSize(n); saveSettings(); }, n -> n + " sp");
         content.addView(text(tr("Reading font", "Шрифт чтения"),20));
-        choice(content,new String[]{tr("Serif", "С засечками"),tr("Sans serif", "Без засечек"),tr("Monospace", "Моноширинный"),tr("Condensed", "Узкий")},font,i -> {font=i; preview.setTypeface(Typeface.create(faces[i],0)); saveSettings();});
+        choice(content,new String[]{tr("Serif", "С засечками"),tr("Sans serif", "Без засечек"),tr("Monospace", "Моноширинный"),tr("Condensed", "Узкий")},font,i -> {font=i; preview.setTypeface(Typeface.create(faces[i],Typeface.NORMAL)); saveSettings();});
         content.addView(text(tr("10 reading themes", "10 тем чтения"),20));
         for (int i=0;i<10;i++) {
             final int selected=i;
