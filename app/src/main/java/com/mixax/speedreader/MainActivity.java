@@ -84,7 +84,10 @@ public class MainActivity extends AppCompatActivity {
     }
     void render() {
         root = vertical(); root.setBackgroundColor(Color.rgb(245,241,231));
-        setContentView(root);
+        boolean compactHeight = !settings && (getResources().getConfiguration().screenHeightDp < 600 || getResources().getConfiguration().fontScale > 1.5f);
+        if (compactHeight) {
+            ScrollView viewport = new ScrollView(this); viewport.setFillViewport(true); viewport.addView(root); setContentView(viewport);
+        } else setContentView(root);
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.ime());
             v.setPadding(dp(16)+bars.left, bars.top, dp(16)+bars.right, bars.bottom); return insets;
@@ -97,7 +100,7 @@ public class MainActivity extends AppCompatActivity {
         row(root, button(tr("Open FB2", "Открыть FB2"), this::open), button(tr("Library", "Библиотека"), this::library));
         LinearLayout stage = vertical(); stage.setGravity(Gravity.CENTER); stage.setPadding(dp(12),0,dp(12),0);
         GradientDrawable surface = new GradientDrawable(); surface.setColor(background); surface.setCornerRadius(dp(20)); stage.setBackground(surface);
-        LinearLayout.LayoutParams stageParams = new LinearLayout.LayoutParams(-1, 0, 1); stageParams.setMargins(0,dp(16),0,dp(12)); root.addView(stage,stageParams);
+        LinearLayout.LayoutParams stageParams = compactHeight ? new LinearLayout.LayoutParams(-1,dp(200)) : new LinearLayout.LayoutParams(-1,0,1); stageParams.setMargins(0,dp(16),0,dp(12)); root.addView(stage,stageParams);
         word = text("",fontSize); word.setTextColor(foreground); word.setTypeface(Typeface.create(faces[font],Typeface.NORMAL)); word.setGravity(Gravity.CENTER);
         word.setSingleLine(true); word.setAutoSizeTextTypeUniformWithConfiguration(12,fontSize,1,android.util.TypedValue.COMPLEX_UNIT_SP);
         word.setMinHeight(dp(64)); word.setFocusable(true); word.setOnClickListener(v -> toggle());

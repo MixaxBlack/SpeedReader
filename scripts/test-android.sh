@@ -17,3 +17,9 @@ adb shell settings put system font_scale 1.3
 sleep 2
 adb exec-out screencap -p > verification/large-font.png
 adb shell settings put system font_scale 1.0
+adb shell settings put system accelerometer_rotation 0
+adb shell settings put system user_rotation 1
+sleep 2
+adb exec-out screencap -p > verification/landscape.png
+adb shell pidof com.mixax.speedreader
+adb shell settings put system user_rotation 0
