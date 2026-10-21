@@ -11,8 +11,8 @@ import android.widget.SeekBar;
 /** Native SeekBar semantics with a vertical track: 500 at the top, 30 at the bottom. */
 public final class VerticalSpeedBar extends androidx.appcompat.widget.AppCompatSeekBar {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final int primary = Color.rgb(55,104,89);
-    private final int track = Color.rgb(193,208,198);
+    private final int primary = MainActivity.ACCENT;
+    private final int track = MainActivity.RULE;
     public VerticalSpeedBar(Context context) {
         super(context);
         setMin(30); setMax(500); setKeyProgressIncrement(1);
@@ -29,7 +29,7 @@ public final class VerticalSpeedBar extends androidx.appcompat.widget.AppCompatS
         paint.setColor(track); canvas.drawRoundRect(x-dp(3),top,x+dp(3),bottom,dp(3),dp(3),paint);
         paint.setColor(primary); canvas.drawRoundRect(x-dp(3),y,x+dp(3),bottom,dp(3),dp(3),paint);
         if(isPressed()||isFocused()) {
-            paint.setColor(0x25376859);canvas.drawCircle(x,y,dp(20),paint);
+            paint.setColor(0x25426650);canvas.drawCircle(x,y,dp(20),paint);
         }
         paint.setColor(primary);canvas.drawCircle(x,y,dp(10),paint);
     }

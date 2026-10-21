@@ -80,7 +80,7 @@ public class LibraryTest {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             scenario.onActivity(a -> {a.language="en";a.startScan(Collections.singletonList(tree("root")));});
             for(int i=0;i<100;i++){final boolean[] done={false};scenario.onActivity(a -> done[0]=!a.busy);if(done[0])break;Thread.sleep(100);}
-            scenario.onActivity(a -> {assertFalse(a.busy);assertTrue(a.libraryOpen);assertTrue(a.libraryEntries.size()>=2);assertTrue(a.libraryMessage.contains("Skipped: 1"));});
+            scenario.onActivity(a -> {assertFalse(a.busy);assertTrue(a.libraryOpen);assertTrue(a.libraryEntries.size()>=2);assertTrue(a.libraryMessage.contains("Skipped: 1"));assertTrue(androidx.core.graphics.ColorUtils.calculateContrast(a.librarySearch.getCurrentHintTextColor(),android.graphics.Color.WHITE)>=4.5);});
             ReaderTest screenshots=new ReaderTest();screenshots.screenshot("library-en.png");
             scenario.onActivity(a -> {a.language="ru";a.libraryMessage="";a.render();});screenshots.screenshot("library-ru.png");
             scenario.onActivity(a -> a.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));Thread.sleep(1400);

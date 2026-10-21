@@ -1,8 +1,16 @@
 <resources>
     <style name="AppTheme" parent="Theme.Material3.Light.NoActionBar">
-        <item name="colorPrimary">#376859</item>
+        <item name="colorPrimary">#426650</item>
+        <item name="colorSecondary">#426650</item>
+        <item name="colorSurface">#F7F6F3</item>
+        <item name="colorOnSurface">#252922</item>
+        <item name="colorOutline">#DCDDD5</item>
+        <item name="android:colorBackground">#F7F6F3</item>
+        <item name="android:statusBarColor">#F7F6F3</item>
+        <item name="android:navigationBarColor">#F7F6F3</item>
+        <item name="android:windowLightNavigationBar">true</item>
         <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="android:fontFamily">sans</item>
+        <item name="android:fontFamily">@font/manrope</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowSoftInputMode">adjustResize</item>

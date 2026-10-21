@@ -55,6 +55,7 @@ public class ReaderTest {
             scenario.onActivity(a -> {a.language="ru";a.theme=1;a.background=Themes.bg(1);a.foreground=Themes.fg(1);a.render();});
             screenshot("phone-ru-night.png");
             scenario.onActivity(a -> {a.settings=true;a.render();});screenshot("settings-ru.png");
+            scenario.onActivity(a -> {for(int i=0;i<a.content.getChildCount();i++){android.view.View child=a.content.getChildAt(i);if(child instanceof android.widget.TextView&&((android.widget.TextView)child).getText().toString().equals("10 тем чтения")){((android.widget.ScrollView)a.content.getParent()).scrollTo(0,child.getTop());break;}}});screenshot("settings-themes-ru.png");
         }
     }
     @Test public void speedRangeUpgradeAndSlowPlayback() throws Exception {

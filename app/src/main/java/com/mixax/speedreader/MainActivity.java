@@ -27,6 +27,8 @@ import android.text.Editable;
 import android.text.TextWatcher;
 
 public class MainActivity extends AppCompatActivity {
+    static final int PAPER=0xFFF7F6F3, INK=0xFF252922, MUTED=0xFF62685D, RULE=0xFFDCDDD5, ACCENT=0xFF426650;
+    Typeface uiFace;
     static final int OPEN = 41, SCAN_FOLDER=42;
     final Handler handler = new Handler(Looper.getMainLooper());
     final ExecutorService io = Executors.newSingleThreadExecutor();
@@ -64,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
     int dp(float n) { return Math.round(n * getResources().getDisplayMetrics().density); }
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
+        uiFace=getResources().getFont(R.font.manrope);
         prefs = getSharedPreferences("reader", MODE_PRIVATE);
         libraryOpen=saved!=null&&saved.getBoolean("libraryOpen",false);
         libraryQuery=saved==null?"":saved.getString("libraryQuery","");
@@ -95,38 +98,52 @@ public class MainActivity extends AppCompatActivity {
         });
     }
     TextView text(String label, int size) {
-        TextView v = new TextView(this); v.setText(label); v.setTextSize(size); v.setTextColor(Color.rgb(36,46,40));
+        TextView v = new TextView(this); v.setText(label); v.setTextSize(size); v.setTextColor(size<=14?MUTED:INK);v.setTypeface(uiFace);v.setFontFeatureSettings("tnum");
         v.setPadding(0, dp(8), 0, dp(8)); return v;
     }
     LinearLayout vertical() { LinearLayout l = new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l; }
     MaterialButton button(String label, Runnable action) {
         MaterialButton b = new MaterialButton(this); b.setText(label); b.setAllCaps(false); b.setMinHeight(dp(48));
+        b.setTypeface(uiFace);b.setTextSize(14);b.setCornerRadius(dp(6));b.setElevation(0);b.setStateListAnimator(null);b.setLetterSpacing(0);
+        b.setPadding(dp(10),0,dp(10),0);b.setInsetTop(dp(4));b.setInsetBottom(dp(4));
+        b.setBackgroundTintList(new ColorStateList(new int[][]{new int[]{-android.R.attr.state_enabled},new int[]{}},new int[]{0xFFE9EAE4,PAPER}));
+        b.setTextColor(new ColorStateList(new int[][]{new int[]{-android.R.attr.state_enabled},new int[]{}},new int[]{0xFF777B73,INK}));
+        b.setStrokeWidth(dp(1));b.setStrokeColor(ColorStateList.valueOf(RULE));b.setRippleColor(ColorStateList.valueOf(0x22426650));
         b.setOnClickListener(v -> action.run()); return b;
     }
+    void primary(MaterialButton b){b.setBackgroundTintList(new ColorStateList(new int[][]{new int[]{-android.R.attr.state_enabled},new int[]{}},new int[]{0xFFE0E2DA,INK}));b.setTextColor(new ColorStateList(new int[][]{new int[]{-android.R.attr.state_enabled},new int[]{}},new int[]{MUTED,Color.WHITE}));b.setStrokeWidth(0);b.setRippleColor(ColorStateList.valueOf(0x33FFFFFF));}
+    void header(String title,MaterialButton action){
+        LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(0,dp(8),0,dp(8));
+        TextView heading=text(title,28);heading.setTypeface(Typeface.create("serif",Typeface.NORMAL));heading.setLetterSpacing(-0.025f);heading.setMaxLines(2);
+        bar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));bar.addView(action,new LinearLayout.LayoutParams(-2,-2));root.addView(bar);divider(root);
+    }
+    void divider(LinearLayout parent){View line=new View(this);line.setBackgroundColor(RULE);parent.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));}
+    void section(LinearLayout parent,String label){TextView heading=text(label,18);heading.setTypeface(uiFace,Typeface.BOLD);heading.setPadding(0,dp(24),0,dp(8));parent.addView(heading);}
+    void field(EditText field){field.setTypeface(uiFace);field.setTextColor(INK);field.setHintTextColor(MUTED);field.setMinHeight(dp(52));field.setTextSize(16);field.setPadding(dp(14),dp(8),dp(14),dp(8));GradientDrawable fill=new GradientDrawable();fill.setColor(Color.WHITE);fill.setCornerRadius(dp(8));fill.setStroke(dp(1),RULE);field.setBackground(fill);}
     void row(LinearLayout parent, View... views) {
         LinearLayout l = new LinearLayout(this); l.setGravity(Gravity.CENTER_VERTICAL);
         for (View v : views) { LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1); p.setMargins(dp(4),0,dp(4),0); l.addView(v,p); }
         parent.addView(l);
     }
     void render() {
-        root = vertical(); root.setBackgroundColor(Color.rgb(245,241,231)); root.setPadding(dp(16),0,dp(16),0);
+        root = vertical(); root.setBackgroundColor(PAPER); root.setPadding(dp(20),0,dp(20),0);
         boolean compactHeight = !settings && !libraryOpen && (getResources().getConfiguration().screenHeightDp < 600 || getResources().getConfiguration().fontScale > 1.5f);
         if (compactHeight) {
             ScrollView viewport = new ScrollView(this); viewport.setFillViewport(true); viewport.addView(root); setContentView(viewport);
         } else setContentView(root);
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.ime());
-            v.setPadding(dp(16)+bars.left, bars.top, dp(16)+bars.right, bars.bottom); return insets;
+            v.setPadding(dp(20)+bars.left, bars.top, dp(20)+bars.right, bars.bottom); return insets;
         });
         ViewCompat.requestApplyInsets(root);
         if (settings) { settingsScreen(); return; }
         if(libraryOpen){libraryScreen();return;}
-        row(root, text("SpeedReader", 24), button(tr("Appearance", "Оформление"), () -> { pause(); settings = true; render(); }));
+        header("SpeedReader",button(tr("Appearance", "Оформление"), () -> { pause(); settings = true; render(); }));
         bookTitle = text(book == null ? tr("Your reading space", "Ваше пространство чтения") : book.title, 18);
-        bookTitle.setMaxLines(2); root.addView(bookTitle);
+        bookTitle.setTypeface(Typeface.create("serif",Typeface.NORMAL));bookTitle.setTextSize(21);bookTitle.setPadding(0,dp(16),0,dp(12));bookTitle.setMaxLines(2); root.addView(bookTitle);
         row(root, button(tr("Open FB2", "Открыть FB2"), this::open), button(tr("Library", "Библиотека"), this::library));
         LinearLayout stage = vertical(); stage.setGravity(Gravity.CENTER); stage.setPadding(dp(12),0,dp(12),0);
-        GradientDrawable surface = new GradientDrawable(); surface.setColor(background); surface.setCornerRadius(dp(20)); stage.setBackground(surface);
+        GradientDrawable surface = new GradientDrawable(); surface.setColor(background); surface.setCornerRadius(dp(8)); stage.setBackground(surface);
         LinearLayout readingArea = new LinearLayout(this);
         LinearLayout.LayoutParams areaParams = compactHeight ? new LinearLayout.LayoutParams(-1,dp(420)) : new LinearLayout.LayoutParams(-1,0,1);
         areaParams.setMargins(0,dp(16),0,dp(12)); root.addView(readingArea,areaParams);
@@ -156,8 +173,9 @@ public class MainActivity extends AppCompatActivity {
         speedRow.addView(faster,new LinearLayout.LayoutParams(dp(64),dp(48)));root.addView(speedRow);
         progress = text("",14); progress.setGravity(Gravity.CENTER); root.addView(progress);
         seek = new Slider(this); seek.setValueFrom(0); seek.setValueTo(1000); seek.setStepSize(1); seek.setContentDescription(tr("Reading position", "Позиция чтения"));
+        seek.setTickVisible(false);seek.setTrackActiveTintList(ColorStateList.valueOf(ACCENT));seek.setTrackInactiveTintList(ColorStateList.valueOf(RULE));seek.setThumbTintList(ColorStateList.valueOf(ACCENT));
         seek.addOnChangeListener((s,v,user) -> { if (user && book != null) { pause(); position = Math.round(v / 1000f * (book.words.size()-1)); update(); savePosition(); } }); root.addView(seek);
-        play = button("", this::toggle);
+        play = button("", this::toggle);primary(play);
         row(root, button(tr("Back 10", "Назад 10"), () -> move(-10)), play, button(tr("Forward 10", "Вперёд 10"), () -> move(10)));
         update();
     }
@@ -278,17 +296,17 @@ public class MainActivity extends AppCompatActivity {
             (!complete&&!r.current.isEmpty()?"\n"+r.current:"");
     }
     void libraryScreen(){
-        row(root,text(tr("Library","Библиотека"),24),button(tr("Read","Читать"),this::closeLibrary));
+        header(tr("Library","Библиотека"),button(tr("Read","Читать"),this::closeLibrary));
         MaterialButton scan=button(scanning?tr("Stop scan","Остановить"):tr("Find FB2","Найти FB2"),() -> {if(scanning){scanCancelled.set(true);}else chooseScanFolder();});scan.setEnabled(scanning||!busy);
-        MaterialButton again=button(tr("Scan again","Повторить"),this::scanAgain);again.setEnabled(!busy);row(root,scan,again);
+        primary(scan);MaterialButton again=button(tr("Scan again","Повторить"),this::scanAgain);again.setEnabled(!busy);row(root,scan,again);
         boolean compactLibrary=getResources().getConfiguration().screenHeightDp<500;
         if(!compactLibrary)root.addView(text(tr("Choose a book folder. All subfolders are scanned. Add more folders whenever you need.","Выберите папку с книгами. Поиск включает все подпапки. Можно добавить несколько папок."),14));
-        librarySearch=new EditText(this);librarySearch.setSingleLine(true);librarySearch.setMinHeight(dp(48));librarySearch.setTextSize(16);librarySearch.setTextColor(Color.rgb(36,46,40));
-        librarySearch.setHintTextColor(Color.rgb(55,104,89));librarySearch.setHint(tr("Search title, author or series","Название, автор или серия"));librarySearch.setContentDescription(tr("Search library","Поиск по библиотеке"));librarySearch.setText(libraryQuery);root.addView(librarySearch);
+        librarySearch=new EditText(this);librarySearch.setSingleLine(true);field(librarySearch);
+        librarySearch.setHint(tr("Search title, author or series","Название, автор или серия"));librarySearch.setContentDescription(tr("Search library","Поиск по библиотеке"));librarySearch.setText(libraryQuery);root.addView(librarySearch);
         libraryStatus=text(scanning?tr("Scanning…","Поиск книг…"):busy?tr("Loading library…","Загрузка библиотеки…"):libraryMessage.isEmpty()?tr("Books: ","Книг: ")+libraryEntries.size():libraryMessage,14);
         libraryStatus.setMaxLines(compactLibrary?2:5);root.addView(libraryStatus);
         android.widget.FrameLayout listFrame=new android.widget.FrameLayout(this);root.addView(listFrame,new LinearLayout.LayoutParams(-1,0,1));
-        libraryList=new ListView(this);libraryList.setDividerHeight(dp(1));libraryList.setEnabled(!busy);listFrame.addView(libraryList,new android.widget.FrameLayout.LayoutParams(-1,-1));
+        libraryList=new ListView(this);libraryList.setDivider(new android.graphics.drawable.ColorDrawable(RULE));libraryList.setDividerHeight(dp(1));libraryList.setEnabled(!busy);listFrame.addView(libraryList,new android.widget.FrameLayout.LayoutParams(-1,-1));
         libraryEmpty=text("",16);libraryEmpty.setGravity(Gravity.CENTER);listFrame.addView(libraryEmpty,new android.widget.FrameLayout.LayoutParams(-1,-1));libraryList.setEmptyView(libraryEmpty);
         libraryAdapter=new LibraryAdapter();libraryList.setAdapter(libraryAdapter);refreshLibraryList();
         librarySearch.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){libraryQuery=s.toString();refreshLibraryList();}public void afterTextChanged(Editable e){}});
@@ -308,7 +326,7 @@ public class MainActivity extends AppCompatActivity {
         public View getView(int index,View recycled,android.view.ViewGroup parent){
             LinearLayout item;
             if(recycled instanceof LinearLayout)item=(LinearLayout)recycled;
-            else{item=vertical();item.setPadding(dp(4),dp(12),dp(4),dp(12));for(int size:new int[]{18,14,13}){TextView label=text("",size);label.setPadding(0,dp(2),0,dp(2));label.setMaxLines(2);label.setEllipsize(android.text.TextUtils.TruncateAt.END);item.addView(label);}}
+            else{item=vertical();item.setPadding(dp(4),dp(16),dp(4),dp(16));for(int size:new int[]{22,15,12}){TextView label=text("",size);if(size==22)label.setTypeface(Typeface.create("serif",Typeface.NORMAL));label.setPadding(0,dp(3),0,dp(3));label.setMaxLines(2);label.setEllipsize(android.text.TextUtils.TruncateAt.END);item.addView(label);}}
             BookStore.Entry entry=filtered.get(index);((TextView)item.getChildAt(0)).setText(entry.displayTitle());
             ((TextView)item.getChildAt(1)).setText(entry.author.isEmpty()?tr("Author not specified","Автор не указан"):entry.author);
             int at=Math.max(0,Math.min(entry.wordCount-1,prefs.getInt("pos_"+entry.id,0)));
@@ -318,25 +336,28 @@ public class MainActivity extends AppCompatActivity {
         }
     }
     void settingsScreen() {
-        row(root, text(tr("Appearance", "Оформление"),24), button(tr("Done", "Готово"), () -> { settings=false; render(); }));
+        header(tr("Appearance", "Оформление"),button(tr("Done", "Готово"), () -> { settings=false; render(); }));
         ScrollView scroll = new ScrollView(this); root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1)); content = vertical(); scroll.addView(content);
-        content.addView(text(tr("Interface language", "Язык интерфейса"),20));
+        section(content,tr("Interface language", "Язык интерфейса"));
         choice(content,new String[]{tr("System", "Системный"),"English","Русский"},Arrays.asList("system","en","ru").indexOf(language), i -> { language = new String[]{"system","en","ru"}[i]; saveSettings(); render(); });
-        content.addView(text(tr("Word preview", "Предпросмотр слова"),20));
+        section(content,tr("Word preview", "Предпросмотр слова"));
         TextView preview = text(tr("Attention", "Внимание"),fontSize); preview.setGravity(Gravity.CENTER); preview.setTextColor(foreground); preview.setBackgroundColor(background); preview.setTypeface(Typeface.create(faces[font],Typeface.NORMAL)); preview.setMinHeight(dp(120)); content.addView(preview);
-        content.addView(text(tr("Word size", "Размер слова"),20));
+        section(content,tr("Word size", "Размер слова"));
         slider(content,18,72,1,fontSize,n -> { fontSize=n; preview.setTextSize(n); saveSettings(); }, n -> n + " sp");
-        content.addView(text(tr("Reading font", "Шрифт чтения"),20));
+        section(content,tr("Reading font", "Шрифт чтения"));
         choice(content,new String[]{tr("Serif", "С засечками"),tr("Sans serif", "Без засечек"),tr("Monospace", "Моноширинный"),tr("Condensed", "Узкий")},font,i -> {font=i; preview.setTypeface(Typeface.create(faces[i],Typeface.NORMAL)); saveSettings();});
-        content.addView(text(tr("10 reading themes", "10 тем чтения"),20));
+        section(content,tr("10 reading themes", "10 тем чтения"));
+        LinearLayout themeRow=null;
         for (int i=0;i<10;i++) {
             final int selected=i;
             MaterialButton b=button((russian()?Themes.RU:Themes.EN)[i] + (theme==i ? tr(" · selected", " · выбрана") : ""), () -> {theme=selected; background=Themes.bg(selected); foreground=Themes.fg(selected); saveSettings(); render();});
-            b.setBackgroundTintList(ColorStateList.valueOf(Themes.bg(i))); b.setTextColor(Themes.fg(i)); content.addView(b);
+            b.setBackgroundTintList(ColorStateList.valueOf(Themes.bg(i))); b.setTextColor(Themes.fg(i));b.setMinHeight(dp(64));b.setStrokeWidth(dp(theme==i?2:1));b.setStrokeColor(ColorStateList.valueOf(theme==i?ACCENT:RULE));
+            if(i%2==0){themeRow=new LinearLayout(this);content.addView(themeRow);}LinearLayout.LayoutParams tile=new LinearLayout.LayoutParams(0,-2,1);tile.setMargins(i%2==0?0:dp(4),0,i%2==0?dp(4):0,0);themeRow.addView(b,tile);
         }
-        content.addView(text(tr("Custom reading colors", "Свои цвета чтения"),20));
+        section(content,tr("Custom reading colors", "Свои цвета чтения"));
         content.addView(text(tr("Use #RRGGBB. Colors apply to the word area.","Формат #RRGGBB. Цвета применяются к области слова."),14));
         LinearLayout colors=vertical(); EditText fg=new EditText(this), bg=new EditText(this);
+        field(fg);field(bg);
         fg.setSingleLine(true); bg.setSingleLine(true); fg.setText(String.format("#%06X",foreground&0xFFFFFF)); bg.setText(String.format("#%06X",background&0xFFFFFF));
         fg.setContentDescription(tr("Text color hex", "HEX цвета текста")); bg.setContentDescription(tr("Background color hex", "HEX цвета фона"));
         colors.addView(text(tr("Text", "Текст"),16)); colors.addView(fg); colors.addView(text(tr("Background", "Фон"),16)); colors.addView(bg); content.addView(colors);
@@ -351,7 +372,7 @@ public class MainActivity extends AppCompatActivity {
     }
     void choice(LinearLayout parent,String[] labels,int current,NumberAction action) {
         RadioGroup group=new RadioGroup(this);
-        for(int i=0;i<labels.length;i++){RadioButton b=new RadioButton(this); b.setId(View.generateViewId()); b.setText(labels[i]); b.setMinHeight(dp(48)); group.addView(b); if(i==current)group.check(b.getId());}
+        for(int i=0;i<labels.length;i++){RadioButton b=new RadioButton(this); b.setId(View.generateViewId()); b.setText(labels[i]);b.setTypeface(uiFace);b.setTextSize(16);b.setTextColor(INK); b.setMinHeight(dp(48)); group.addView(b); if(i==current)group.check(b.getId());}
         group.setOnCheckedChangeListener((g,id) -> action.accept(g.indexOfChild(g.findViewById(id)))); parent.addView(group);
     }
     @Override protected void onPause(){pause(); saveSettings(); super.onPause();}
