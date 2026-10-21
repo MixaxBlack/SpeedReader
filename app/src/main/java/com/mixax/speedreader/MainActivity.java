@@ -38,6 +38,9 @@ public class MainActivity extends AppCompatActivity {
     boolean playing, settings, busy;
     String language;
     LinearLayout root, content;
+    LinearLayout backdropRoot;
+    boolean backdropDark;
+    int backdropLeft=-1,backdropRight=-1,backdropBottom=-1;
     TextView word, progress, bookTitle, state, speedValue;
     MaterialButton play, faster, slower;
     VerticalSpeedBar speedControl;
@@ -120,7 +123,25 @@ public class MainActivity extends AppCompatActivity {
     void divider(LinearLayout parent){View line=new View(this);line.setBackgroundColor(RULE);parent.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));}
     void section(LinearLayout parent,String label){TextView heading=text(label,18);heading.setFontVariationSettings("'wght' 600");heading.setPadding(0,dp(24),0,dp(8));parent.addView(heading);}
     void styleSlider(Slider slider){slider.setTickVisible(false);slider.setTrackActiveTintList(ColorStateList.valueOf(ACCENT));slider.setTrackInactiveTintList(ColorStateList.valueOf(RULE));slider.setThumbTintList(ColorStateList.valueOf(ACCENT));}
-    void systemBars(){if(root==null)return;androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),root);bars.setAppearanceLightStatusBars(true);bars.setAppearanceLightNavigationBars(Build.VERSION.SDK_INT>=27);if(Build.VERSION.SDK_INT>=29){getWindow().setNavigationBarContrastEnforced(false);getWindow().getDecorView().setForceDarkAllowed(false);}}
+    boolean darkNavigation(){return Build.VERSION.SDK_INT<27||(android.content.res.Resources.getSystem().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;}
+    void systemBars(){
+        if(root==null)return;boolean dark=darkNavigation();
+        androidx.core.view.WindowInsetsControllerCompat bars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),root);
+        bars.setAppearanceLightStatusBars(true);bars.setAppearanceLightNavigationBars(!dark);
+        if(Build.VERSION.SDK_INT>=29){getWindow().setNavigationBarContrastEnforced(false);getWindow().getDecorView().setForceDarkAllowed(false);}
+        WindowInsetsCompat insets=ViewCompat.getRootWindowInsets(root);
+        androidx.core.graphics.Insets nav=dark&&insets!=null?insets.getInsets(WindowInsetsCompat.Type.navigationBars()):androidx.core.graphics.Insets.NONE;
+        if(backdropRoot==root&&backdropDark==dark&&backdropLeft==nav.left&&backdropRight==nav.right&&backdropBottom==nav.bottom)return;
+        backdropRoot=root;backdropDark=dark;backdropLeft=nav.left;backdropRight=nav.right;backdropBottom=nav.bottom;
+        int left=root.getPaddingLeft(),top=root.getPaddingTop(),right=root.getPaddingRight(),bottom=root.getPaddingBottom();
+        if(dark){
+            // Android 15 draws navigation over app content. Protect its actual inset,
+            // including a side-mounted navigation bar, without darkening the reader.
+            android.graphics.drawable.LayerDrawable backdrop=new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{new android.graphics.drawable.ColorDrawable(INK),new android.graphics.drawable.ColorDrawable(PAPER)});
+            backdrop.setLayerInset(1,nav.left,0,nav.right,nav.bottom);root.setBackground(backdrop);
+        }else root.setBackgroundColor(PAPER);
+        root.setPadding(left,top,right,bottom);
+    }
     void field(EditText field){field.setTypeface(uiFace);field.setTextColor(INK);field.setHintTextColor(MUTED);field.setMinHeight(dp(52));field.setTextSize(16);field.setPadding(dp(14),dp(8),dp(14),dp(8));GradientDrawable fill=new GradientDrawable();fill.setColor(Color.WHITE);fill.setCornerRadius(dp(8));fill.setStroke(dp(1),RULE);field.setBackground(fill);}
     void row(LinearLayout parent, View... views) {
         LinearLayout l = new LinearLayout(this); l.setGravity(Gravity.CENTER_VERTICAL);
@@ -382,6 +403,8 @@ public class MainActivity extends AppCompatActivity {
         group.setOnCheckedChangeListener((g,id) -> action.accept(g.indexOfChild(g.findViewById(id)))); parent.addView(group);
     }
     @Override protected void onResume(){super.onResume();systemBars();if(root!=null)root.post(this::systemBars);}
+    @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused){systemBars();if(root!=null)root.post(this::systemBars);}}
+    @Override public void onConfigurationChanged(android.content.res.Configuration configuration){super.onConfigurationChanged(configuration);systemBars();if(root!=null)root.post(this::systemBars);}
     @Override protected void onPause(){pause(); saveSettings(); super.onPause();}
     @Override protected void onSaveInstanceState(Bundle out){out.putBoolean("libraryOpen",libraryOpen);out.putBoolean("scanning",scanning);out.putString("libraryQuery",libraryQuery);super.onSaveInstanceState(out);}
     @Override protected void onDestroy(){scanCancelled.set(true);handler.removeCallbacksAndMessages(null); io.shutdownNow(); super.onDestroy();}
