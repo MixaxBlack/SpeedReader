@@ -8,7 +8,17 @@ pull_screenshots() {
   done
 }
 trap pull_screenshots EXIT
-gradle --no-daemon :app:connectedDebugAndroidTest
+gradle --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.mixax.speedreader.PhoneStorageGrantTest,com.mixax.speedreader.PhoneStorageOfflineTest
+# Android restarts the UID when storage access changes. Change app-ops between
+# instrumentation processes, as a real return from Android Settings would do.
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell appops set --uid com.mixax.speedreader MANAGE_EXTERNAL_STORAGE allow
+adb shell am instrument -w -r -e class com.mixax.speedreader.PhoneStorageGrantTest com.mixax.speedreader.test/androidx.test.runner.AndroidJUnitRunner | tee verification/phone-granted-tests.txt
+grep -q 'OK (1 test)' verification/phone-granted-tests.txt
+adb shell appops set --uid com.mixax.speedreader MANAGE_EXTERNAL_STORAGE ignore
+adb shell am instrument -w -r -e class com.mixax.speedreader.PhoneStorageOfflineTest com.mixax.speedreader.test/androidx.test.runner.AndroidJUnitRunner | tee verification/phone-offline-tests.txt
+grep -q 'OK (1 test)' verification/phone-offline-tests.txt
 pull_screenshots
 # Install the actual release APK after removing the differently signed test build.
 if adb shell pm list packages com.mixax.speedreader | grep -q 'package:com.mixax.speedreader'; then

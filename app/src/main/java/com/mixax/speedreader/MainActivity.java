@@ -462,7 +462,7 @@ public class MainActivity extends AppCompatActivity {
         for(int i=0;i<labels.length;i++){RadioButton b=new RadioButton(this); b.setId(View.generateViewId()); b.setText(labels[i]);b.setTypeface(uiFace);b.setTextSize(16);b.setTextColor(INK); b.setMinHeight(dp(48)); group.addView(b); if(i==current)group.check(b.getId());}
         group.setOnCheckedChangeListener((g,id) -> action.accept(g.indexOfChild(g.findViewById(id)))); parent.addView(group);
     }
-    @Override protected void onResume(){super.onResume();systemBars();if(root!=null)root.post(this::systemBars);}
+    @Override protected void onResume(){super.onResume();systemBars();if(root!=null)root.post(this::systemBars);if(pendingPhoneAccess&&hasPhoneAccess()){pendingPhoneAccess=false;startPhoneScan(PhoneScanner.roots(this));}}
     @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused){systemBars();if(root!=null)root.post(this::systemBars);}}
     @Override public void onConfigurationChanged(android.content.res.Configuration configuration){super.onConfigurationChanged(configuration);systemBars();if(root!=null)root.post(this::systemBars);}
     @Override protected void onPause(){pause(); saveSettings(); super.onPause();}
