@@ -11,7 +11,7 @@ Signed release APK. CI builds and lints, runs parser and reader instrumentation 
 
 Download SpeedReader-1.4.2.apk below and allow installation from your browser when Android asks.
 
-Full-width word area. Tap the speed value to access the vertical speed slider in Appearance; +1/−1 stay on the reader. Long words temporarily shrink to fit, then the next word uses the preferred size again.
+The vertical speed slider stays on the reader, collapsed by default. Tap its visible outlined tab or the underlined speed value to expand/collapse it without pausing or changing screens. Expansion reserves word width; collapse restores full width. The expanded state survives rotation. +1/−1 stay on the reader; Appearance retains a secondary slider. Long words temporarily shrink to fit, then the next word uses the preferred size again.
 
 New library scanner: Library → Find FB2. Choose one or more book folders through Android, scan subfolders, and repeat scans without duplicates. Read title, author, series, genre and language from FB2 files. Search the library, see word counts/progress, stop scanning and keep already imported books. Malformed/inaccessible files are reported and skipped. Book copies remain available offline. Original files are read only; this folder flow needs no all-files permission.
 

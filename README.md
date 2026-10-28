@@ -21,7 +21,7 @@ For a release set SPEEDREADER_KEYSTORE to a private keystore containing the `spe
 
 CI gates release publication on lint, instrumentation tests (encoding, XML boundaries, ZIP, local cache, playback, seeking, persistence and languages), installation/launch of the actual signed APK and signature verification. Screenshots and test reports are attached to the run as `android-verification`. A checksum accompanies the release.
 
-The reading stage uses the full width. Tap the underlined speed value to open the vertical 30–500 words/min slider in Appearance; +1/−1 remain on the reader. Speed supports touch, keyboard and accessibility progress actions. Each word is measured at the preferred font size and shrinks only when needed; the next word restores that preferred size automatically without changing the saved setting.
+The reading stage uses the full width while its speed slider is collapsed. Tap the visible speed tab at the top-right of the stage or the underlined speed value to expand/collapse the vertical 30–500 words/min slider inline, without pausing or changing screens. The expanded rail reserves width and the word refits; collapse restores full width. It starts collapsed and retains its expanded state across rotation. +1/−1 remain on the reader, and Appearance retains a secondary slider. Speed supports touch, keyboard and accessibility progress actions. Each word is measured at the preferred font size and shrinks only when needed; the next word restores that preferred size automatically without changing the saved setting.
 
 ## Scan books into the library
 
