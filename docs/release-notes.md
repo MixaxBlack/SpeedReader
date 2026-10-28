@@ -9,7 +9,7 @@ Native offline Android FB2 speed reader. Android 8.0 and newer.
 
 Signed release APK. CI builds and lints, runs parser and reader instrumentation tests on Android 15, installs and launches the actual release APK, verifies its signature and publishes SHA256SUMS.
 
-Download SpeedReader-1.4.1.apk below and allow installation from your browser when Android asks.
+Download SpeedReader-1.4.2.apk below and allow installation from your browser when Android asks.
 
 Full-width word area. Tap the speed value to access the vertical speed slider in Appearance; +1/−1 stay on the reader. Long words temporarily shrink to fit, then the next word uses the preferred size again.
 

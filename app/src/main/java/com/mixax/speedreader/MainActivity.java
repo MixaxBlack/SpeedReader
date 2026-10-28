@@ -45,6 +45,9 @@ public class MainActivity extends AppCompatActivity {
     TextView word, progress, bookTitle, state, speedValue;
     MaterialButton play, faster, slower,rotateButton;
     VerticalSpeedBar speedControl;
+    LinearLayout readerSpeedRail;
+    MaterialButton speedToggle;
+    boolean speedExpanded;
     Slider seek;
     boolean libraryOpen,scanning;
     AtomicBoolean scanCancelled=new AtomicBoolean();
@@ -73,6 +76,7 @@ public class MainActivity extends AppCompatActivity {
     int dp(float n) { return Math.round(n * getResources().getDisplayMetrics().density); }
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
+        speedExpanded=saved!=null&&saved.getBoolean("speedExpanded",false);
         uiFace=getResources().getFont(R.font.ui_regular);
         prefs = getSharedPreferences("reader", MODE_PRIVATE);
         libraryOpen=saved!=null&&saved.getBoolean("libraryOpen",false);
@@ -179,11 +183,22 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams rotateCell=new LinearLayout.LayoutParams(dp(48),dp(48));rotateCell.setMargins(dp(4),0,dp(4),0);actions.addView(rotateButton,rotateCell);root.addView(actions);
         LinearLayout stage = vertical(); stage.setGravity(Gravity.CENTER); stage.setPadding(dp(12),0,dp(12),0);
         GradientDrawable surface = new GradientDrawable(); surface.setColor(background); surface.setCornerRadius(dp(8)); stage.setBackground(surface);
+        FrameLayout readingFrame=new FrameLayout(this);
         LinearLayout readingArea = new LinearLayout(this);
         LinearLayout.LayoutParams areaParams = compactHeight ? new LinearLayout.LayoutParams(-1,dp(420)) : new LinearLayout.LayoutParams(-1,0,1);
-        areaParams.setMargins(0,dp(16),0,dp(12)); root.addView(readingArea,areaParams);
+        areaParams.setMargins(0,dp(16),0,dp(12)); root.addView(readingFrame,areaParams);
+        readingFrame.addView(readingArea,new FrameLayout.LayoutParams(-1,-1));
         readingArea.addView(stage,new LinearLayout.LayoutParams(0,-1,1));
-        speedControl=null;
+        readerSpeedRail=vertical();readerSpeedRail.setPadding(0,dp(48),0,0);
+        readingArea.addView(readerSpeedRail,new LinearLayout.LayoutParams(dp(64),-1));
+        TextView railMaximum=text("500",14);railMaximum.setGravity(Gravity.CENTER);readerSpeedRail.addView(railMaximum);
+        speedControl=new VerticalSpeedBar(this);speedControl.setProgress(speed);
+        speedControl.setContentDescription(tr("Reading speed, words per minute. Up to increase.","Скорость чтения, слов в минуту. Вверх — быстрее."));
+        readerSpeedRail.addView(speedControl,new LinearLayout.LayoutParams(-1,0,1));
+        TextView railMinimum=text("30",14);railMinimum.setGravity(Gravity.CENTER);readerSpeedRail.addView(railMinimum);
+        speedControl.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar bar,int value,boolean user){changeSpeed(value);}public void onStartTrackingTouch(SeekBar bar){}public void onStopTrackingTouch(SeekBar bar){}});
+        speedToggle=button("",this::toggleReaderSpeed);speedToggle.setIcon(androidx.appcompat.content.res.AppCompatResources.getDrawable(this,R.drawable.ic_speed));speedToggle.setIconSize(dp(24));speedToggle.setIconPadding(0);speedToggle.setIconTint(speedToggle.getTextColors());
+        FrameLayout.LayoutParams speedTab=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.END);readingFrame.addView(speedToggle,speedTab);updateReaderSpeed();
         faster=button("+1",() -> changeSpeed(speed+1));faster.setSingleLine(true);faster.setPadding(0,0,0,0);faster.setContentDescription(tr("Faster by 1 word per minute", "Быстрее на 1 слово в минуту"));
         slower=button("−1",() -> changeSpeed(speed-1));slower.setSingleLine(true);slower.setPadding(0,0,0,0);slower.setContentDescription(tr("Slower by 1 word per minute", "Медленнее на 1 слово в минуту"));
         word = new FittingWordView(this); word.setTextColor(foreground); word.setTypeface(Typeface.create(faces[font],Typeface.NORMAL)); word.setGravity(Gravity.CENTER);
@@ -191,7 +206,7 @@ public class MainActivity extends AppCompatActivity {
         word.setMinHeight(dp(64)); word.setFocusable(true); word.setOnClickListener(v -> toggle());
         stage.setOnClickListener(v -> toggle()); stage.addView(word,new LinearLayout.LayoutParams(-1,-2));
         state = text("", 14); state.setTextColor(foreground); state.setGravity(Gravity.CENTER); stage.addView(state);
-        speedValue=text("",16);speedValue.setGravity(Gravity.CENTER);speedValue.setMinHeight(dp(48));speedValue.setTextColor(ACCENT);speedValue.setPaintFlags(speedValue.getPaintFlags()|Paint.UNDERLINE_TEXT_FLAG);speedValue.setFocusable(true);speedValue.setOnClickListener(v -> showSpeedSettings());
+        speedValue=text("",16);speedValue.setGravity(Gravity.CENTER);speedValue.setMinHeight(dp(48));speedValue.setTextColor(ACCENT);speedValue.setPaintFlags(speedValue.getPaintFlags()|Paint.UNDERLINE_TEXT_FLAG);speedValue.setFocusable(true);speedValue.setOnClickListener(v -> toggleReaderSpeed());
         LinearLayout speedRow=new LinearLayout(this);speedRow.setGravity(Gravity.CENTER_VERTICAL);
         speedRow.addView(slower,new LinearLayout.LayoutParams(dp(64),dp(48)));
         speedRow.addView(speedValue,new LinearLayout.LayoutParams(0,-2,1));
@@ -205,6 +220,13 @@ public class MainActivity extends AppCompatActivity {
         if(getResources().getConfiguration().fontScale>1.15f||getResources().getConfiguration().screenWidthDp<360){row(root,back,forward);root.addView(play,new LinearLayout.LayoutParams(-1,dp(52)));}
         else row(root,back,play,forward);
         update();
+    }
+    void toggleReaderSpeed(){speedExpanded=!speedExpanded;updateReaderSpeed();}
+    void updateReaderSpeed(){
+        readerSpeedRail.setVisibility(speedExpanded?View.VISIBLE:View.GONE);
+        String label=speedExpanded?tr("Collapse speed slider","Свернуть полосу скорости"):tr("Expand speed slider","Развернуть полосу скорости");
+        speedToggle.setContentDescription(label);speedToggle.setTooltipText(label);speedToggle.setSelected(speedExpanded);
+        ViewCompat.setStateDescription(speedToggle,speedExpanded?tr("Expanded","Развёрнута"):tr("Collapsed","Свёрнута"));
     }
     void changeSpeed(int requested) {
         int next=Math.max(30,Math.min(500,requested));
@@ -475,6 +497,6 @@ public class MainActivity extends AppCompatActivity {
     @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused){systemBars();if(root!=null)root.post(this::systemBars);}}
     @Override public void onConfigurationChanged(android.content.res.Configuration configuration){super.onConfigurationChanged(configuration);systemBars();if(root!=null)root.post(this::systemBars);}
     @Override protected void onPause(){pause(); saveSettings(); super.onPause();}
-    @Override protected void onSaveInstanceState(Bundle out){out.putBoolean("libraryOpen",libraryOpen);out.putBoolean("phoneFilesOpen",phoneFilesOpen);out.putBoolean("pendingPhoneAccess",pendingPhoneAccess);out.putBoolean("scanning",scanning);out.putString("libraryQuery",libraryQuery);super.onSaveInstanceState(out);}
+    @Override protected void onSaveInstanceState(Bundle out){out.putBoolean("speedExpanded",speedExpanded);out.putBoolean("libraryOpen",libraryOpen);out.putBoolean("phoneFilesOpen",phoneFilesOpen);out.putBoolean("pendingPhoneAccess",pendingPhoneAccess);out.putBoolean("scanning",scanning);out.putString("libraryQuery",libraryQuery);super.onSaveInstanceState(out);}
     @Override protected void onDestroy(){scanCancelled.set(true);handler.removeCallbacksAndMessages(null); io.shutdownNow(); super.onDestroy();}
 }
